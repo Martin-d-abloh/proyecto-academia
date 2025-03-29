@@ -30,36 +30,35 @@ def create_app():
         app.config['ADMINISTRADORES']["superadmin"] = superadmin
         guardar_administradores(app.config['ADMINISTRADORES'])
 
-    @app.route("/")
-    def home():
-        return render_template("home.html", tablas=app.config['TABLAS'])
-
-    # Autenticación Admin
-    @app.route("/login_admin", methods=["GET", "POST"])
-    def login_admin():
+    @app.route("/", methods=["GET", "POST"])
+    def login():
         if request.method == "POST":
             usuario = request.form.get("usuario", "").lower().strip()
             contrasena = request.form.get("contrasena", "").strip()
             admin = app.config['ADMINISTRADORES'].get(usuario)
+
             if admin and admin.contrasena == contrasena:
                 session['usuario_admin'] = usuario
                 flash(f"Bienvenido, {admin.nombre}", "success")
-                return redirect(url_for("home"))
+                if usuario == "superadmin":
+                    return redirect(url_for("superadmin_home"))
+                else:
+                    return redirect(url_for("admin_home"))
             else:
                 flash("Credenciales incorrectas", "error")
-        return render_template("admin/login_admin.html")
+        return render_template("login.html")
 
     @app.route("/logout")
     def logout():
         session.pop('usuario_admin', None)
         flash("Sesión cerrada", "info")
-        return redirect(url_for("login_admin"))
+        return redirect(url_for("login"))
 
     @app.route("/crear_admin", methods=["GET", "POST"])
     def crear_admin():
         if session.get("usuario_admin") != "superadmin":
             flash("Acceso restringido al superadministrador", "error")
-            return redirect(url_for("home"))
+            return redirect(url_for("superadmin_home"))
         if request.method == "POST":
             nombre = request.form.get("nombre", "").strip()
             usuario = request.form.get("usuario", "").lower().strip()
@@ -74,10 +73,9 @@ def create_app():
             app.config['ADMINISTRADORES'][usuario] = nuevo_admin
             guardar_administradores(app.config['ADMINISTRADORES'])
             flash(f"Administrador '{nombre}' creado correctamente", "success")
-            return redirect(url_for("home"))
-        return render_template("admin/crear_admin.html")
+            return redirect(url_for("superadmin_home"))
+        return render_template("superadmin/crear_admin.html")  # Aseguramos la ruta correcta
 
-    # TABLAS
     @app.route("/crear_tabla", methods=["GET", "POST"])
     def crear_tabla():
         if request.method == "POST":
@@ -101,7 +99,7 @@ def create_app():
                     flash(str(e), "error")
             else:
                 flash("No se encontró un administrador activo para asignar esta tabla.", "error")
-            return redirect(url_for("home"))
+            return redirect(url_for("admin_home"))
         return render_template("tablas/crear_tabla.html")
 
     @app.route("/tablas/<id_tabla>")
@@ -109,28 +107,25 @@ def create_app():
         tabla = app.config['TABLAS'].get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
-            return redirect(url_for("home"))
+            return redirect(url_for("admin_home"))
         return render_template("tablas/ver_tabla.html", tabla=tabla)
 
     @app.route("/eliminar_tabla/<id_tabla>", methods=["POST"])
     def eliminar_tabla(id_tabla):
-        """Elimina una tabla y todos sus datos"""
         if id_tabla in app.config['TABLAS']:
             del app.config['TABLAS'][id_tabla]
             guardar_tablas(app.config['TABLAS'])
             flash("Tabla eliminada correctamente", "success")
         else:
             flash("Tabla no encontrada", "error")
+        return redirect(url_for("admin_home"))
 
-        return redirect(url_for("home"))
-
-# ALUMNOS
     @app.route("/tablas/<id_tabla>/crear_alumno", methods=["GET", "POST"])
     def crear_alumno(id_tabla):
         tabla = app.config['TABLAS'].get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
-            return redirect(url_for("home"))
+            return redirect(url_for("admin_home"))
         if request.method == "POST":
             nombre = request.form.get("nombre", "").strip()
             apellidos = request.form.get("apellidos", "").strip()
@@ -148,7 +143,7 @@ def create_app():
         alumno = next((a for tabla in app.config['TABLAS'].values() for a in tabla.alumnos if a.id == alumno_id), None)
         if not alumno:
             flash("Alumno no encontrado", "error")
-            return redirect(url_for("home"))
+            return redirect(url_for("login"))
         if session.get(f'alumno_logeado_{alumno_id}') != True:
             if request.method == 'POST':
                 contrasena_ingresada = normalizar(request.form.get("contrasena", ""))
@@ -173,15 +168,12 @@ def create_app():
             return redirect(url_for('vista_subir_documentos', alumno_id=alumno_id))
         return render_template("alumnos/subir_documentos.html", alumno=alumno)
 
-
     @app.route("/tablas/<id_tabla>/eliminar_alumno/<alumno_id>", methods=["POST"])
     def eliminar_alumno(id_tabla, alumno_id):
-        """Elimina un alumno de una tabla específica"""
         tabla = app.config['TABLAS'].get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
-            return redirect(url_for("home"))
-
+            return redirect(url_for("admin_home"))
         alumno_encontrado = next((a for a in tabla.alumnos if a.id == alumno_id), None)
         if alumno_encontrado:
             tabla.alumnos.remove(alumno_encontrado)
@@ -189,10 +181,8 @@ def create_app():
             flash("Alumno eliminado correctamente", "success")
         else:
             flash("Alumno no encontrado", "error")
-
         return redirect(url_for("ver_tabla", id_tabla=id_tabla))
 
-    # DESCARGA
     @app.route('/descargar/<alumno_id>/<documento>')
     def descargar_documento(alumno_id, documento):
         for tabla in app.config['TABLAS'].values():
@@ -203,6 +193,39 @@ def create_app():
                         carpeta, nombre_archivo = os.path.split(archivo_info['ruta'])
                         return send_from_directory(carpeta, nombre_archivo, as_attachment=True)
         return "Archivo no encontrado o acceso no autorizado", 404
+
+    @app.route("/superadmin_home")
+    def superadmin_home():
+        if session.get("usuario_admin") != "superadmin":
+            flash("Acceso restringido al superadministrador", "error")
+            return redirect(url_for("login"))
+        admins = list(app.config['ADMINISTRADORES'].values())
+        return render_template("superadmin/superadmin_home.html", lista_admins=admins)
+
+    @app.route("/admin/<admin_nombre>")
+    def ver_tablas_admin(admin_nombre):
+        if session.get("usuario_admin") != "superadmin":
+            flash("Acceso restringido", "error")
+            return redirect(url_for("login"))
+        admin = app.config['ADMINISTRADORES'].get(admin_nombre)
+        if not admin:
+            flash("Administrador no encontrado", "error")
+            return redirect(url_for("superadmin_home"))
+        tablas = [app.config['TABLAS'][tid] for tid in admin.tablas if tid in app.config['TABLAS']]
+        return render_template("admin/home.html", tablas=tablas, admin=admin)
+
+    @app.route("/admin_home")
+    def admin_home():
+        usuario = session.get('usuario_admin')
+        if not usuario or usuario == "superadmin":
+            flash("Acceso no autorizado", "error")
+            return redirect(url_for("login"))
+        admin = app.config['ADMINISTRADORES'].get(usuario)
+        if not admin:
+            flash("Administrador no encontrado", "error")
+            return redirect(url_for("login"))
+        tablas = [app.config['TABLAS'][tid] for tid in admin.tablas if tid in app.config['TABLAS']]
+        return render_template("admin/home.html", tablas=tablas, admin=admin)
 
     return app
 

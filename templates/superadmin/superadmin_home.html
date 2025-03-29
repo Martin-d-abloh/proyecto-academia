@@ -1,0 +1,24 @@
+<!-- templates/superadmin/superadmin_home.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h2>Panel del Superadministrador</h2>
+
+    <a href="{{ url_for('crear_admin') }}">
+        <button>Crear nuevo administrador</button>
+    </a>
+
+    <h3>Administradores registrados:</h3>
+    <ul>
+        {% for admin in lista_admins %}
+            <li>
+                <a href="{{ url_for('ver_tablas_admin', admin_nombre=admin.nombre) }}">
+                    <button>{{ admin.nombre }}</button>
+                </a>
+            </li>
+        {% else %}
+            <p>No hay administradores registrados aún.</p>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
