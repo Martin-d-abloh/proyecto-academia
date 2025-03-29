@@ -4,8 +4,9 @@ from werkzeug.utils import secure_filename
 import os
 
 # Modelos y gestión de almacenamiento
-from models import Tabla, Alumno
-from storage import guardar_tablas, cargar_tablas
+from models import Tabla, Alumno, Administrador
+from storage import guardar_tablas, cargar_tablas, guardar_administradores, cargar_administradores
+
 
 # Configuración de archivos subidos
 UPLOAD_FOLDER = 'uploads'
@@ -56,10 +57,23 @@ def create_app():
             app.config['TABLAS'][nueva_tabla.id] = nueva_tabla
             guardar_tablas(app.config['TABLAS'])
 
-            flash(f"Tabla '{nombre}' creada con {len(documentos)} documentos", "success")
+            # Buscar administrador logeado
+            usuario_actual = session.get('usuario_admin')
+            admin = app.config['ADMINISTRADORES'].get(usuario_actual)
+
+            if admin:
+                try:
+                    admin.agregar_tabla(nueva_tabla.id)
+                    flash(f"Tabla '{nombre}' creada y asignada a {admin.nombre}", "success")
+                except ValueError as e:
+                    flash(str(e), "error")
+            else:
+                flash("No se encontró un administrador activo para asignar esta tabla.", "error")
+
             return redirect(url_for("home"))
 
         return render_template("tablas/crear_tabla.html")
+
 
     @app.route("/tablas/<id>")
     def ver_tabla(id):
@@ -136,26 +150,46 @@ def create_app():
     # Gestión de documentos
     # --------------------------
     
+    import unicodedata
+
+    def normalizar(texto):
+        texto = texto.lower().replace(" ", "")
+        texto = unicodedata.normalize('NFD', texto)
+        return ''.join(c for c in texto if unicodedata.category(c) != 'Mn' or c == 'ñ')
+
     @app.route('/alumno/<alumno_id>', methods=['GET', 'POST'])
     def vista_subir_documentos(alumno_id):
-        """Handle para subida de documentos de alumnos"""
-        # Búsqueda cross-tablas del alumno
+        """Login de alumno + subida de documentos"""
         alumno = next(
             (a for tabla in app.config['TABLAS'].values()
-             for a in tabla.alumnos
-             if a.id == alumno_id),
+            for a in tabla.alumnos
+            if a.id == alumno_id),
             None
         )
         if not alumno:
             flash("Alumno no encontrado", "error")
-            return redirect(url_for('home'))
+            return redirect(url_for("home"))
 
+        # LOGIN de alumno
+        if session.get(f'alumno_logeado_{alumno_id}') != True:
+            if request.method == 'POST':
+                contrasena_ingresada = normalizar(request.form.get("contrasena", ""))
+                contrasena_correcta = normalizar(f"{alumno.nombre}{alumno.apellidos}")
+
+                if contrasena_ingresada == contrasena_correcta:
+                    session[f'alumno_logeado_{alumno_id}'] = True
+                    flash("Bienvenido/a. Puedes subir tus documentos.", "success")
+                    return redirect(url_for("vista_subir_documentos", alumno_id=alumno_id))
+                else:
+                    flash("Contraseña incorrecta", "error")
+
+            return render_template("alumnos/login_alumno.html", alumno=alumno)
+
+        # SUBIDA de documentos
         if request.method == 'POST':
-            # Procesamiento de archivos subidos
             for nombre_doc in alumno.documentos:
                 archivo = request.files.get(nombre_doc)
                 if archivo and archivo.filename:
-                    # Sanitización y guardado seguro
                     nombre_seguro = secure_filename(archivo.filename)
                     ruta = os.path.join(app.config['UPLOAD_FOLDER'], f"{alumno.id}_{nombre_doc}_{nombre_seguro}")
                     archivo.save(ruta)
@@ -180,7 +214,73 @@ def create_app():
                         return send_from_directory(carpeta, nombre_archivo, as_attachment=True)
 
         return "Archivo no encontrado o acceso no autorizado", 404
+    
+    # --------------------------
+    # Gestión de administradores
+    # --------------------------    
+
+    from flask import session
+
+    @app.route("/login_admin", methods=["GET", "POST"])
+    def login_admin():
+        """Permite a los administradores ingresar con sus credenciales"""
+        if request.method == "POST":
+            usuario = request.form.get("usuario", "").lower().strip()
+            contrasena = request.form.get("contrasena", "").strip()
+
+            admin = app.config['ADMINISTRADORES'].get(usuario)
+
+            if admin and admin.contrasena == contrasena:
+                session['usuario_admin'] = usuario
+                flash(f"Bienvenido, {admin.nombre}", "success")
+                return redirect(url_for("home"))
+            else:
+                flash("Credenciales incorrectas", "error")
+                return redirect(url_for("login_admin"))
+
+        return render_template("admin/login_admin.html")
+    
+    @app.route("/logout")
+    def logout():
+        session.pop('usuario_admin', None)
+        flash("Sesión cerrada", "info")
+        return redirect(url_for("login_admin"))
+    
+    @app.route("/crear_admin", methods=["GET", "POST"])
+    def crear_admin():
+        """Permite al superadmin crear nuevos administradores"""
+        if session.get("usuario_admin") != "superadmin":
+            flash("Acceso restringido al superadministrador", "error")
+            return redirect(url_for("home"))
+
+        if request.method == "POST":
+            nombre = request.form.get("nombre", "").strip()
+            usuario = request.form.get("usuario", "").lower().strip()
+            contrasena = request.form.get("contrasena", "").strip()
+
+            if not nombre or not usuario or not contrasena:
+                flash("Todos los campos son obligatorios", "error")
+                return redirect(url_for("crear_admin"))
+
+            if usuario in app.config['ADMINISTRADORES']:
+                flash("Ya existe un administrador con ese usuario", "error")
+                return redirect(url_for("crear_admin"))
+
+            nuevo_admin = Administrador(nombre, usuario, contrasena)
+            app.config['ADMINISTRADORES'][usuario] = nuevo_admin
+
+            # Guardar administradores en disco
+            guardar_administradores(app.config['ADMINISTRADORES'])
+
+            flash(f"Administrador '{nombre}' creado correctamente", "success")
+            return redirect(url_for("home"))
+
+        return render_template("admin/crear_admin.html")
+
+
+
     return app
+
 
 
 if __name__ == "__main__":

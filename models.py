@@ -103,3 +103,24 @@ class Alumno:
     def __repr__(self) -> str:
         estado = 'OK' if self.todo_bien else 'Pendiente'
         return f"<Alumno {self.nombre} | Docs: {self._documentos.keys()} | {estado}>"
+#-------------------------------------------------------------------------------
+# CLASE ADMINISTRADOR 
+# -------------------------------------------------------------------------------
+import uuid
+
+class Administrador:
+    """Representa un usuario administrador con capacidades de gestión específicas."""
+
+    def __init__(self, nombre, usuario, contrasena):
+        self.id = str(uuid.uuid4())  # ID único seguro (UUIDv4)
+        self.nombre = nombre.strip()
+        self.usuario = usuario.lower().strip()
+        self.contrasena = contrasena  # En texto plano por ahora
+        self.tablas = []  # Lista de IDs de tablas gestionadas
+
+    def agregar_tabla(self, tabla_id):
+        """Añade una tabla a la lista de gestionadas si no está ya incluida."""
+        if tabla_id not in self.tablas:
+            self.tablas.append(tabla_id)
+        else:
+            raise ValueError("La tabla ya está gestionada por este administrador.")

@@ -17,3 +17,18 @@ def cargar_tablas() -> dict:
         with RUTA_DATOS.open("rb") as f:
             return pickle.load(f)
     return {}
+
+import pickle
+import os
+
+ADMIN_PATH = "datos/admins.pkl"
+
+def guardar_administradores(admins):
+    with open(ADMIN_PATH, "wb") as f:
+        pickle.dump(admins, f)
+
+def cargar_administradores():
+    if os.path.exists(ADMIN_PATH):
+        with open(ADMIN_PATH, "rb") as f:
+            return pickle.load(f)
+    return {}
