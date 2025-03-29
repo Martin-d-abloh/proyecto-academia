@@ -1,0 +1,17 @@
+<!-- templates/alumnos/crear_alumno.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Crear alumno en {{ tabla.nombre }}</h1>
+<form method="POST">
+    <div>
+        <label>Nombre:</label>
+        <input type="text" name="nombre" required>
+    </div>
+    <div>
+        <label>Apellidos:</label>
+        <input type="text" name="apellidos" required>
+    </div>
+    <button type="submit">Guardar</button>
+</form>
+{% endblock %}

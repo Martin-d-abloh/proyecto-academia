@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>{{ tabla.nombre }}</h1>
+    
+    <a href="{{ url_for('crear_alumno', id_tabla=tabla.id) }}">Nuevo alumno</a>
+
+    <h2>Alumnos:</h2>
+
+    {% if tabla.alumnos %}
+        <table border="1" cellpadding="6" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    {% for doc in tabla.documentos %}
+                        <th>{{ doc }}</th>
+                    {% endfor %}
+                    <th>Estado general</th>
+                    <th>Link único</th>
+                    <th>Eliminar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alumno in tabla.alumnos %}
+                    <tr>
+                        <td>{{ alumno.nombre }} {{ alumno.apellidos }}</td>
+                        {% for doc in tabla.documentos %}
+                            <td>
+                                {% if alumno.documentos[doc]['estado'] %}
+                                    ✅
+                                {% else %}
+                                    ❌
+                                {% endif %}
+                                {% if alumno.documentos[doc]['estado'] and alumno.documentos[doc]['ruta'] %}
+                                    <br>
+                                    <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc) }}">📥 Descargar</a>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td>
+                            {% if alumno.todo_bien %}
+                                ✅
+                            {% else %}
+                                ❌
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ alumno.link }}">{{ alumno.link }}</a>
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('eliminar_alumno', id_tabla=tabla.id, alumno_id=alumno.id) }}">
+                                <button type="submit" onclick="return confirm('¿Eliminar este alumno?')">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No hay alumnos registrados.</p>
+    {% endif %}
+{% endblock %}
