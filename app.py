@@ -368,17 +368,15 @@ def create_app():
         flash("Alumno no encontrado", "error")
         return redirect(url_for("login_alumno"))
 
-    
+
     @app.route("/tabla/<id_tabla>/añadir_documento", methods=["POST"])
     def añadir_documento(id_tabla):
         tabla = app.config['TABLAS'].get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
             return redirect(url_for("admin_home"))
-
         nuevo_doc = request.form.get("nuevo_documento", "").strip()
         nuevo_doc = re.sub(r"[^a-zA-Z0-9_ñÑáéíóúÁÉÍÓÚ\s]", "", nuevo_doc).strip()
-
         if not nuevo_doc:
             flash("Nombre del documento vacío o inválido", "error")
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
@@ -387,12 +385,11 @@ def create_app():
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
         tabla.documentos.append(nuevo_doc)
         for alumno in tabla.alumnos:
-            alumno.documentos[nuevo_doc] = {"estado": False, "ruta": None}
+            if nuevo_doc not in alumno._documentos:
+                alumno._documentos[nuevo_doc] = {"estado": False, "ruta": None}
         guardar_tablas(app.config['TABLAS'])
         flash(f"Documento '{nuevo_doc}' añadido a la tabla", "success")
         return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-
-
 
     @app.route("/tabla/<id_tabla>/eliminar_documento/<documento>", methods=["POST"])
     def eliminar_documento_tabla(id_tabla, documento):
@@ -405,20 +402,24 @@ def create_app():
             flash("Documento no encontrado en la tabla", "error")
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
 
-        # Eliminar documento de la tabla
+        # Eliminar documento del listado general de la tabla
         tabla.documentos.remove(documento)
 
-        # Eliminar documento de todos los alumnos
+        # Eliminar documento de cada alumno y borrar archivo si existe
         for alumno in tabla.alumnos:
             if documento in alumno.documentos:
                 doc_info = alumno.documentos[documento]
                 if doc_info.get("ruta") and os.path.exists(doc_info["ruta"]):
-                    os.remove(doc_info["ruta"])
+                    try:
+                        os.remove(doc_info["ruta"])
+                    except Exception as e:
+                        print(f"[ERROR] No se pudo eliminar el archivo: {e}")
                 del alumno.documentos[documento]
 
         guardar_tablas(app.config['TABLAS'])
         flash(f"Documento '{documento}' eliminado correctamente", "success")
         return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+
 
 
 
