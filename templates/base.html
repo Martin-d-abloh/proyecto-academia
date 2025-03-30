@@ -8,12 +8,15 @@
 <body>
     <div class="container">
         <nav class="nav-bar">
-            {% if session.get('usuario_admin') == 'superadmin' %}
-                <a href="{{ url_for('superadmin_home') }}" class="nav-link">Inicio</a>
-            {% elif session.get('usuario_admin') %}
-                <a href="{{ url_for('admin_home') }}" class="nav-link">Inicio</a>
+            {% if session.get('usuario_admin') %}
+                {% if session['usuario_admin'] == 'superadmin' %}
+                    <a href="{{ url_for('superadmin_home') }}" class="nav-link">Inicio</a>
+                {% else %}
+                    <a href="{{ url_for('admin_home') }}" class="nav-link">Inicio</a>
+                {% endif %}
             {% endif %}
         </nav>
+        
         
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

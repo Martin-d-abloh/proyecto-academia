@@ -1,15 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-    <div class="container">
-        <h2>Acceso para alumnos</h2>
-        <p>Introduce tu nombre y apellidos sin espacios, en minúscula y sin tildes (con ñ si la tienes).</p>
+<div class="container">
+    <h2>Acceso para alumnos</h2>
 
-        <form method="POST">
-            <label for="credencial">Nombre completo (ej. martingarcia):</label><br>
-            <input type="text" name="credencial" id="credencial" required><br><br>
-            <button type="submit">Entrar</button>
-        </form>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <p class="{{ category }}">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-        <a href="{{ url_for('login') }}">Volver al login de administrador</a>
-    </div>
+    <p>Introduce tu nombre y apellidos todo junto, en minúsculas, sin tildes pero con ñ si la lleva (ej. martingarciañunez)</p>
+
+    <form method="POST">
+        <label for="password">Contraseña:</label><br>
+        <input type="text" name="password" id="password" required><br><br>
+        <button type="submit">Entrar</button>
+    </form>
+    
+</div>
 {% endblock %}
+

@@ -2,6 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 import os
 import unicodedata
+import hashlib
+import unicodedata
+import re
+
+
 
 from models import Tabla, Alumno, Administrador
 from storage import (
@@ -16,6 +21,10 @@ def normalizar(texto):
     texto = texto.lower().replace(" ", "")
     texto = unicodedata.normalize('NFD', texto)
     return ''.join(c for c in texto if unicodedata.category(c) != 'Mn' or c == 'ñ')
+
+def generar_hash_credencial(nombre: str, apellidos: str) -> str:
+    completo = normalizar(nombre + apellidos)
+    return hashlib.sha256(completo.encode()).hexdigest()
 
 def create_app():
     app = Flask(__name__)
@@ -173,24 +182,46 @@ def create_app():
         if not tabla:
             flash("Tabla no encontrada", "error")
             return redirect(url_for("admin_home"))
+
         if request.method == "POST":
             nombre = request.form.get("nombre", "").strip()
             apellidos = request.form.get("apellidos", "").strip()
+
             if not nombre:
                 flash("El nombre es obligatorio", "error")
                 return redirect(url_for("crear_alumno", id_tabla=id_tabla))
+
+            # Crear el alumno normalmente
             nuevo_alumno = tabla.crear_alumno(nombre, apellidos)
+
+            # Asignar la contraseña hasheada
+            nuevo_alumno.password = generar_hash_credencial(nombre, apellidos)
+
             guardar_tablas(app.config['TABLAS'])
             flash(f"Alumno {nombre} {apellidos} creado en {tabla.nombre}", "success")
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+
         return render_template("alumnos/crear_alumno.html", tabla=tabla)
+
 
     @app.route("/alumno/<alumno_id>", methods=["GET", "POST"])
     def ver_alumno(alumno_id):
+        session.pop("usuario_admin", None)  # Limpia la sesión de administrador
+
         for tabla in app.config['TABLAS'].values():
             for alumno in tabla.alumnos:
                 if alumno.id == alumno_id:
+                    if request.method == "POST" and 'password' in request.form:
+                        input_pwd = request.form.get("password", "")
+                        hash_input = generar_hash_credencial(alumno.nombre, alumno.apellidos)
+                        if input_pwd and hashlib.sha256(input_pwd.encode()).hexdigest() == hash_input:
+                            return render_template("alumnos/subir_documentos.html", alumno=alumno)
+                        else:
+                            flash("Contraseña incorrecta", "error")
+                            return render_template("alumnos/login_alumno.html", alumno=alumno)
+
                     if request.method == "POST":
+                        se_subio_algo = False
                         for nombre_doc in alumno.documentos:
                             archivo = request.files.get(nombre_doc)
                             if archivo and archivo.filename:
@@ -200,13 +231,24 @@ def create_app():
                                 archivo.save(os.path.join(ruta, filename))
                                 ruta_relativa = os.path.join(ruta, filename)
                                 alumno.subir_documento(nombre_doc, ruta_relativa)
-                        guardar_tablas(app.config['TABLAS'])
-                        flash("Documentos subidos correctamente", "success")
-                        return redirect(url_for("ver_alumno", alumno_id=alumno_id))
+                                se_subio_algo = True
 
-                    return render_template("alumnos/subir_documentos.html", alumno=alumno)
+                        if se_subio_algo:
+                            guardar_tablas(app.config['TABLAS'])
+                            flash("Documentos subidos correctamente", "success")
+                        else:
+                            flash("No se subió ningún archivo", "error")
+
+                        return render_template("alumnos/subir_documentos.html", alumno=alumno)
+
+                    return render_template("alumnos/login_alumno.html", alumno=alumno)
+
         flash("Alumno no encontrado", "error")
         return redirect(url_for("login"))
+
+
+
+
 
     @app.route("/tablas/<id_tabla>/eliminar_alumno/<alumno_id>", methods=["POST"])
     def eliminar_alumno(id_tabla, alumno_id):
@@ -223,6 +265,8 @@ def create_app():
     
     @app.route("/login_alumno", methods=["GET", "POST"])
     def login_alumno():
+        session.pop("usuario_admin", None)  # Limpiar sesión del admin SIEMPRE
+
         if request.method == "POST":
             credencial = request.form.get("credencial", "").strip().lower()
             credencial = normalizar(credencial)
@@ -237,7 +281,8 @@ def create_app():
             flash("Credencial no válida", "error")
             return redirect(url_for("login_alumno"))
 
-        return render_template("login_alumno.html")
+        return render_template("alumnos/login_alumno.html")
+
 
 
     @app.route("/superadmin_home")
@@ -310,12 +355,70 @@ def create_app():
                         ruta = doc_info["ruta"]
                         if os.path.exists(ruta):
                             os.remove(ruta)
-                        alumno.eliminar_documento(documento)  # ✅ Usa el método que actualiza estado
+                        alumno.eliminar_documento(documento)  # ✅ Cambia estado a False y elimina ruta
                         guardar_tablas(app.config['TABLAS'])
                         flash(f"Documento '{documento}' eliminado", "success")
                     else:
                         flash("Documento no encontrado o no subido", "error")
-                    return redirect(url_for("ver_alumno", alumno_id=alumno_id))
+
+                    # ⚠️ IMPORTANTE: siempre renderiza la vista del alumno
+                    return render_template("alumnos/subir_documentos.html", alumno=alumno)
+
+        # Si no se encuentra el alumno
+        flash("Alumno no encontrado", "error")
+        return redirect(url_for("login_alumno"))
+
+    
+    @app.route("/tabla/<id_tabla>/añadir_documento", methods=["POST"])
+    def añadir_documento(id_tabla):
+        tabla = app.config['TABLAS'].get(id_tabla)
+        if not tabla:
+            flash("Tabla no encontrada", "error")
+            return redirect(url_for("admin_home"))
+
+        nuevo_doc = request.form.get("nuevo_documento", "").strip()
+        nuevo_doc = re.sub(r"[^a-zA-Z0-9_ñÑáéíóúÁÉÍÓÚ\s]", "", nuevo_doc).strip()
+
+        if not nuevo_doc:
+            flash("Nombre del documento vacío o inválido", "error")
+            return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+        if nuevo_doc in tabla.documentos:
+            flash("Ese documento ya existe en esta tabla", "error")
+            return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+        tabla.documentos.append(nuevo_doc)
+        for alumno in tabla.alumnos:
+            alumno.documentos[nuevo_doc] = {"estado": False, "ruta": None}
+        guardar_tablas(app.config['TABLAS'])
+        flash(f"Documento '{nuevo_doc}' añadido a la tabla", "success")
+        return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+
+
+
+    @app.route("/tabla/<id_tabla>/eliminar_documento/<documento>", methods=["POST"])
+    def eliminar_documento_tabla(id_tabla, documento):
+        tabla = app.config['TABLAS'].get(id_tabla)
+        if not tabla:
+            flash("Tabla no encontrada", "error")
+            return redirect(url_for("admin_home"))
+
+        if documento not in tabla.documentos:
+            flash("Documento no encontrado en la tabla", "error")
+            return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+
+        # Eliminar documento de la tabla
+        tabla.documentos.remove(documento)
+
+        # Eliminar documento de todos los alumnos
+        for alumno in tabla.alumnos:
+            if documento in alumno.documentos:
+                doc_info = alumno.documentos[documento]
+                if doc_info.get("ruta") and os.path.exists(doc_info["ruta"]):
+                    os.remove(doc_info["ruta"])
+                del alumno.documentos[documento]
+
+        guardar_tablas(app.config['TABLAS'])
+        flash(f"Documento '{documento}' eliminado correctamente", "success")
+        return redirect(url_for("ver_tabla", id_tabla=id_tabla))
 
 
 

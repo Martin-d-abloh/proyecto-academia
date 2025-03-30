@@ -57,7 +57,7 @@ class Tabla:
 
 class Alumno:
     
-    __slots__ = ('_id', 'nombre', 'apellidos', '_documentos', '_estado_general')
+    __slots__ = ('_id', 'nombre', 'apellidos', '_documentos', '_estado_general', 'password')
 
     def __init__(self, nombre: str, apellidos: str, documentos: List[str]):
         self.nombre = nombre.strip()
@@ -65,6 +65,8 @@ class Alumno:
         self._id = uuid4().hex
         self._documentos = {doc: {'estado': False, 'ruta': None} for doc in documentos}
         self._estado_general = False
+        self.password = ""  # Placeholder para la contraseña
+
 
     @property
     def id(self) -> str:

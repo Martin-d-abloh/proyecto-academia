@@ -15,7 +15,13 @@
                 <tr>
                     <th>Nombre</th>
                     {% for doc in tabla.documentos %}
-                        <th>{{ doc }}</th>
+                        <th>
+                            {{ doc }}
+                            <!-- Botón de eliminar documento -->
+                            <form method="POST" action="{{ url_for('eliminar_documento_tabla', id_tabla=tabla.id, documento=doc) }}" style="margin-top: 5px;">
+                                <button type="submit" style="font-size: 10px;" onclick="return confirm('¿Eliminar este documento de toda la tabla?')">🗑️</button>
+                            </form>
+                        </th>
                     {% endfor %}
                     <th>Estado general</th>
                     <th>Link único</th>
@@ -27,15 +33,20 @@
                     <tr>
                         <td>{{ alumno.nombre }} {{ alumno.apellidos }}</td>
                         {% for doc in tabla.documentos %}
+                            {% set doc_info = alumno.documentos.get(doc) %}
                             <td>
-                                {% if alumno.documentos[doc]['estado'] %}
-                                    ✅
+                                {% if doc_info %}
+                                    {% if doc_info.estado %}
+                                        ✅
+                                    {% else %}
+                                        ❌
+                                    {% endif %}
+                                    {% if doc_info.estado and doc_info.ruta %}
+                                        <br>
+                                        <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc) }}">📥 Descargar</a>
+                                    {% endif %}
                                 {% else %}
                                     ❌
-                                {% endif %}
-                                {% if alumno.documentos[doc]['estado'] and alumno.documentos[doc]['ruta'] %}
-                                    <br>
-                                    <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc) }}">📥 Descargar</a>
                                 {% endif %}
                             </td>
                         {% endfor %}
@@ -58,8 +69,15 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Formulario para añadir nuevo documento -->
+        <h3>Añadir nuevo documento a esta tabla:</h3>
+        <form method="POST" action="{{ url_for('añadir_documento', id_tabla=tabla.id) }}">
+            <input type="text" name="nuevo_documento" placeholder="Nombre del nuevo documento" required>
+            <button type="submit">Añadir documento</button>
+        </form>
+
     {% else %}
         <p>No hay alumnos registrados.</p>
     {% endif %}
 {% endblock %}
-

@@ -3,6 +3,12 @@
     <h1>Subir documentos para {{ alumno.nombre }} {{ alumno.apellidos }}</h1>
 
     <form method="POST" enctype="multipart/form-data">
+        {% if alumno.todo_bien %}
+        <p style="color: green; font-weight: bold;">
+            ✅ Ya has subido todos los documentos. Si lo necesitas, puedes volver a subirlos.
+        </p>
+    {% endif %}
+    
         <ul>
             {% for nombre_doc, info in alumno.documentos.items() %}
                 <li>
