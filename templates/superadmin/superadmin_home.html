@@ -1,8 +1,12 @@
-<!-- templates/superadmin/superadmin_home.html -->
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
     <h2>Panel del Superadministrador</h2>
+
+    <!-- Botón de Logout -->
+    <a href="{{ url_for('logout_admin') }}">
+        <button>Cerrar sesión</button>
+    </a>    
 
     <a href="{{ url_for('crear_admin') }}">
         <button>Crear nuevo administrador</button>
@@ -12,13 +16,33 @@
     <ul>
         {% for admin in lista_admins %}
             <li>
-                <a href="{{ url_for('ver_tablas_admin', admin_nombre=admin.nombre) }}">
-                    <button>{{ admin.nombre }}</button>
-                </a>
+                <span>{{ admin.nombre }}</span>
+
+                <!-- Botón de redirección sin JS embebido -->
+                <button class="ver-admin" data-url="{{ url_for('ver_admin_home', admin_nombre=admin.usuario) }}">Ver</button>
+
+                {% if admin.usuario != "superadmin" %}
+                    <form action="{{ url_for('eliminar_admin', usuario=admin.usuario) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                    </form>
+                {% endif %}
             </li>
         {% else %}
             <p>No hay administradores registrados aún.</p>
         {% endfor %}
     </ul>
 </div>
+
+<!-- Script para manejar la redirección limpia -->
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".ver-admin").forEach(btn => {
+            btn.addEventListener("click", () => {
+                window.location.href = btn.dataset.url;
+            });
+        });
+    });
+</script>
 {% endblock %}
+<!--  -->
+

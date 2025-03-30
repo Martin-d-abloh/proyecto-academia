@@ -1,39 +1,44 @@
-{# 
-  Plantilla: subir_documentos.html
-  Propósito: Permite subir documentos pendientes y ver los ya subidos para un alumno
-  Estructura:
-    - Listado de documentos con estado actual
-    - Formulario dinámico para subir archivos
-    - Enlaces de descarga para documentos existentes
- 
-  #}
-  {% extends "base.html" %}
-  {% block content %}
-      <h1>Subir documentos para {{ alumno.nombre }} {{ alumno.apellidos }}</h1>
-  
-      {# Formulario principal para carga de archivos #}
-      <form method="POST" enctype="multipart/form-data">
-          <ul>
-              {% for nombre_doc, info in alumno.documentos.items() %}
-                  <li>
-                      <label>{{ nombre_doc }}:</label>
-                      
-                      {# Documento ya subido #}
-                      {% if info.estado %}
-                          ✅ Subido
-                          <a href="/{{ info.ruta }}" download>Descargar</a>
-                      
-                      {# Documento pendiente #}
-                      {% else %}
-                          <input type="file" 
-                                 name="{{ nombre_doc }}" 
-                                 accept=".pdf,.doc,.jpg,.jpeg,.png">
-                      {% endif %}
-                  </li>
-              {% endfor %}
-          </ul>
-          
-          {# Botón de envío del formulario #}
-          <button type="submit">Subir documentos</button>
-      </form>
-  {% endblock %}
+{% extends "base.html" %}
+{% block content %}
+    <h1>Subir documentos para {{ alumno.nombre }} {{ alumno.apellidos }}</h1>
+
+    <form method="POST" enctype="multipart/form-data">
+        <ul>
+            {% for nombre_doc, info in alumno.documentos.items() %}
+                <li>
+                    <label>{{ nombre_doc }}:</label>
+
+                    {% if info.estado %}
+                        ✅ Subido
+
+                        <!-- Botón de descarga -->
+                        <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=nombre_doc) }}">Descargar</a>
+                    {% else %}
+                        <input type="file" 
+                               name="{{ nombre_doc }}" 
+                               accept=".pdf,.doc,.jpg,.jpeg,.png"
+                               autocomplete="off">
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <button type="submit">Subir documentos</button>
+    </form>
+
+    <!-- Formularios de eliminación fuera del form principal -->
+    <ul>
+        {% for nombre_doc, info in alumno.documentos.items() if info.estado %}
+            <li style="margin-top: 10px;">
+                <form action="{{ url_for('eliminar_documento', alumno_id=alumno.id, documento=nombre_doc) }}"
+                      method="POST"
+                      onsubmit="return confirm('¿Seguro que quieres eliminar este archivo?')"
+                      style="display:inline;">
+                    <button type="submit" style="background:none; border:none; cursor:pointer;">
+                        🗑️ Eliminar {{ nombre_doc }}
+                    </button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

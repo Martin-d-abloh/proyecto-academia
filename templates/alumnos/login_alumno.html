@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Acceso de Alumno</h2>
-<p>Hola {{ alumno.nombre }} {{ alumno.apellidos }}. Introduce tu contraseña para subir documentos.</p>
+    <div class="container">
+        <h2>Acceso para alumnos</h2>
+        <p>Introduce tu nombre y apellidos sin espacios, en minúscula y sin tildes (con ñ si la tienes).</p>
 
-<form method="POST">
-    <label>Contraseña:</label><br>
-    <input type="password" name="contrasena" required><br><br>
-    <button type="submit">Ingresar</button>
-</form>
+        <form method="POST">
+            <label for="credencial">Nombre completo (ej. martingarcia):</label><br>
+            <input type="text" name="credencial" id="credencial" required><br><br>
+            <button type="submit">Entrar</button>
+        </form>
+
+        <a href="{{ url_for('login') }}">Volver al login de administrador</a>
+    </div>
 {% endblock %}

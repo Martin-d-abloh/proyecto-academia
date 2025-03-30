@@ -1,20 +1,33 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Tablas disponibles</h2>
+<div class="container">
+    <h2>Panel de Administrador: {{ admin.nombre }}</h2>
+
+    <h3>Opciones:</h3>
+    <!-- Botones de acción para el administrador -->
+    <a href="{{ url_for('crear_tabla') }}">
+        <button>Crear nueva tabla</button>
+    </a>
+
+    <h3>Tablas asignadas a {{ admin.nombre }}:</h3>
     <ul>
         {% for tabla in tablas %}
             <li>
                 <a href="{{ url_for('ver_tabla', id_tabla=tabla.id) }}">{{ tabla.nombre }}</a>
-
-                <form action="{{ url_for('eliminar_tabla', id_tabla=tabla.id) }}" method="post" style="display:inline;">
-                    <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+                <form action="{{ url_for('eliminar_tabla', id_tabla=tabla.id) }}" method="POST" style="display:inline;">
+                    <button type="submit">🗑️</button>
                 </form>
             </li>
+        {% else %}
+            <p>{{ admin.nombre }} no tiene tablas asignadas.</p>
         {% endfor %}
     </ul>
 
-    <a href="{{ url_for('crear_tabla') }}" class="btn btn-primary mt-3">➕ Crear nueva tabla</a>
+    <!-- Botón de logout -->
+    <a href="{{ url_for('logout_admin') }}">
+        <button>Logout</button>
+    </a>
+    
 </div>
 {% endblock %}
+
