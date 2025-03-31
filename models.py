@@ -5,6 +5,7 @@ Módulo optimizado para gestión de tablas y alumnos con documentos académicos.
 
 from uuid import uuid4
 from typing import List, Dict, Optional
+import os
 
 #-------------------------------------------------------------------------------
 # CLASE TABLA 
@@ -133,13 +134,8 @@ class Administrador:
     def agregar_tabla(self, id_tabla):
         """Asigna una tabla al administrador (por ID)."""
         self.tablas.append(id_tabla)
+    @property
+    def es_superadmin(self):
+        print("Comparando:", self.usuario, os.getenv("SUPERADMIN_USUARIO"))
+        return self.usuario == os.getenv("SUPERADMIN_USUARIO", "adminroot")
 
-
-#-------------------------------------------------------------------------------
-# CLASE SuperAdmin
-# -------------------------------------------------------------------------------
-
-class SuperAdmin(Administrador):
-    def __init__(self, nombre, usuario, contrasena):
-        super().__init__(nombre, usuario, contrasena)
-        self.is_superadmin = True
