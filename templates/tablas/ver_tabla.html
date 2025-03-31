@@ -18,8 +18,8 @@
                         <th>
                             {{ doc }}
                             <!-- Botón de eliminar documento -->
-                            <form method="POST" action="{{ url_for('eliminar_documento_tabla', id_tabla=tabla.id, documento=doc) }}" style="margin-top: 5px;">
-                                <button type="submit" style="font-size: 10px;" onclick="return confirm('¿Eliminar este documento de toda la tabla?')">🗑️</button>
+                            <form method="POST" action="{{ url_for('eliminar_documento_tabla', id_tabla=tabla.id, nombre_doc=doc) }}" style="margin-top: 5px;">
+                             <button type="submit" style="font-size: 10px;" onclick="return confirm('¿Eliminar este documento de toda la tabla?')">🗑️</button>
                             </form>
                         </th>
                     {% endfor %}
