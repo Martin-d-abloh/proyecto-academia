@@ -38,8 +38,11 @@ def create_app():
     app.config['TABLAS'] = cargar_tablas()
     app.config['ADMINISTRADORES'] = cargar_administradores()
 
-    usuario = os.getenv("SUPERADMIN_USUARIO", "adminroot")
-    contrasena = os.getenv("SUPERADMIN_CONTRASENA", "MiC0ntr4s3ñ4Segura!")
+    usuario = os.getenv("SUPERADMIN_USUARIO")
+    contrasena = os.getenv("SUPERADMIN_CONTRASENA")
+
+    if not usuario or not contrasena:
+        raise Exception("Debes definir SUPERADMIN_USUARIO y SUPERADMIN_CONTRASENA en tu archivo .env")
 
     admins = cargar_administradores()
 
@@ -52,7 +55,6 @@ def create_app():
         print("Superadmin ya existe:", usuario)
 
     app.config['ADMINISTRADORES'] = admins
-
 
 
 
