@@ -1,33 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-    <h2>Panel de Administrador: {{ admin.nombre }}</h2>
-
-    <h3>Opciones:</h3>
-    <!-- Botones de acción para el administrador -->
-    <a href="{{ url_for('crear_tabla') }}">
-        <button>Crear nueva tabla</button>
-    </a>
-
-    <h3>Tablas asignadas a {{ admin.nombre }}:</h3>
-    <ul>
-        {% for tabla in tablas %}
-            <li>
-                <a href="{{ url_for('ver_tabla', id_tabla=tabla.id) }}">{{ tabla.nombre }}</a>
-                <form action="{{ url_for('eliminar_tabla', id_tabla=tabla.id) }}" method="POST" style="display:inline;">
-                    <button type="submit">🗑️</button>
-                </form>
-            </li>
-        {% else %}
-            <p>{{ admin.nombre }} no tiene tablas asignadas.</p>
-        {% endfor %}
-    </ul>
-
-    <!-- Botón de logout -->
-    <a href="{{ url_for('logout_admin') }}">
-        <button>Logout</button>
-    </a>
+    <h2>Panel de Administrador: {{ admin_actual.nombre }}</h2>
     
+    <!-- Mostrar rol (admin/superadmin) -->
+    {% if admin_actual.es_superadmin %}
+        <div class="alert alert-info">🔑 Eres Superadministrador</div>
+    {% endif %}
+
+    <div class="action-buttons">
+        <a href="{{ url_for('crear_tabla') }}" class="btn btn-primary">
+            ➕ Crear nueva tabla
+        </a>
+        
+        <!-- Botón de logout -->
+        <a href="{{ url_for('logout_admin') }}" class="btn btn-secondary">
+            🔒 Logout
+        </a>
+    </div>
+
+    <h3>Tablas asignadas:</h3>
+    {% if tablas %}
+        <ul class="list-group">
+            {% for tabla in tablas %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('ver_tabla', id_tabla=tabla.id) }}">
+                        📋 {{ tabla.nombre }} 
+                        <small class="text-muted">
+                            (Creada: {{ tabla.fecha_creacion.strftime('%d/%m/%Y') }})
+                        </small>
+                    </a>
+                    
+                    <form action="{{ url_for('eliminar_tabla', id_tabla=tabla.id) }}" method="POST">
+                        <button type="submit" class="btn btn-sm btn-danger" 
+                                onclick="return confirm('¿Eliminar esta tabla y todos sus alumnos?')">
+                            🗑️ Eliminar
+                        </button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="alert alert-warning">
+            No tienes tablas asignadas. Crea una para comenzar.
+        </div>
+    {% endif %}
 </div>
 {% endblock %}
 

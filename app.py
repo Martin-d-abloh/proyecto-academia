@@ -1,24 +1,42 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, send_file, session
-from werkzeug.utils import secure_filename
-import os
-import unicodedata
-import hashlib
-import unicodedata
-import re
-from dotenv import load_dotenv
-import os
-
-load_dotenv()  
-
-
-
-
-from models import Tabla, Alumno, Administrador
-from storage import (
-    guardar_tablas, cargar_tablas,
-    guardar_administradores, cargar_administradores
+# 1. Flask y extensiones 
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    send_from_directory,
+    send_file,  
+    session
 )
 
+from werkzeug.utils import secure_filename
+
+# 2. Utilidades estándar de Python 
+import os
+import re
+import unicodedata 
+
+# 3. Variables de entorno
+from dotenv import load_dotenv
+# 4. Base de datos y modelos 
+from database import init_db
+from models import (
+    db,
+    Administrador,
+    Alumno,
+    Tabla,
+    Documento,
+)
+# 5. helpers
+from helpers import obtener_admin_actual
+import hashlib
+from datetime import datetime
+
+
+# Cargar variables de entorno
+load_dotenv()
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
 
@@ -33,29 +51,32 @@ def generar_hash_credencial(nombre: str, apellidos: str) -> str:
 
 def create_app():
     app = Flask(__name__)
+    init_db(app)
     app.secret_key = "supersecreto"
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-    app.config['TABLAS'] = cargar_tablas()
-    app.config['ADMINISTRADORES'] = cargar_administradores()
 
+    # ✅ Leemos las variables de entorno
     usuario = os.getenv("SUPERADMIN_USUARIO")
     contrasena = os.getenv("SUPERADMIN_CONTRASENA")
 
     if not usuario or not contrasena:
         raise Exception("Debes definir SUPERADMIN_USUARIO y SUPERADMIN_CONTRASENA en tu archivo .env")
 
-    admins = cargar_administradores()
-
-    if usuario not in admins:
-        superadmin = Administrador("Super Admin", usuario, contrasena)
-        admins[usuario] = superadmin
-        guardar_administradores(admins)
-        print("Superadmin creado correctamente:", usuario)
-    else:
-        print("Superadmin ya existe:", usuario)
-
-    app.config['ADMINISTRADORES'] = admins
-
+    # ✅ Creamos el superadmin solo si no existe en la base de datos
+    with app.app_context():
+        admin_existente = Administrador.query.filter_by(usuario=usuario).first()
+        if not admin_existente:
+            superadmin = Administrador(
+                nombre="Super Admin",
+                usuario=usuario,
+                es_superadmin=True
+            )
+            superadmin.password = contrasena  # esto guarda el hash
+            db.session.add(superadmin)
+            db.session.commit()
+            print("✅ Superadmin creado correctamente:", usuario)
+        else:
+            print("ℹ️ Superadmin ya existe:", usuario)
 
 
 
@@ -65,8 +86,11 @@ def create_app():
         if request.method == "POST":
             usuario = request.form.get("usuario", "").lower().strip()
             contrasena = request.form.get("contrasena", "").strip()
-            admin = app.config['ADMINISTRADORES'].get(usuario)
-            if admin and admin.contrasena == contrasena:
+
+            # Usamos SQLAlchemy para buscar al admin en la base de datos
+            admin = Administrador.query.filter_by(usuario=usuario).first()
+
+            if admin and admin.check_password(contrasena):
                 session['usuario_admin'] = usuario
                 flash(f"Bienvenido, {admin.nombre}", "success")
 
@@ -76,7 +100,10 @@ def create_app():
                     return redirect(url_for("admin_home"))
             else:
                 flash("Credenciales incorrectas", "error")
-        return render_template("login.html")
+        
+        return render_template("login.html", admin_actual=obtener_admin_actual())
+
+
 
 
 
@@ -95,10 +122,12 @@ def create_app():
 
     @app.route("/crear_admin", methods=["GET", "POST"])
     def crear_admin():
-        usuario = session.get("usuario_admin")
-        admin = app.config['ADMINISTRADORES'].get(usuario)
+        if not session.get("usuario_admin"):
+            return redirect(url_for("login"))
+        
+        admin_actual = obtener_admin_actual()
 
-        if not admin or not getattr(admin, "es_superadmin", False):
+        if not admin_actual or not admin_actual.es_superadmin:
             flash("Acceso restringido al superadministrador", "error")
             return redirect(url_for("superadmin_home"))
 
@@ -107,321 +136,603 @@ def create_app():
             usuario_nuevo = request.form.get("usuario", "").strip()
             contrasena = request.form.get("contrasena", "").strip()
 
-            if not nombre or not usuario_nuevo or not contrasena:
+            if not all([nombre, usuario_nuevo, contrasena]):
                 flash("Todos los campos son obligatorios", "error")
                 return redirect(url_for("crear_admin"))
 
             usuario_nuevo = normalizar(usuario_nuevo)
 
-            if usuario_nuevo in app.config['ADMINISTRADORES']:
+            if Administrador.query.filter_by(usuario=usuario_nuevo).first():
                 flash("Ya existe un administrador con ese usuario", "error")
                 return redirect(url_for("crear_admin"))
 
-            nuevo_admin = Administrador(nombre, usuario_nuevo, contrasena)
-            app.config['ADMINISTRADORES'][usuario_nuevo] = nuevo_admin
-            guardar_administradores(app.config['ADMINISTRADORES'])
+            try:
+                nuevo_admin = Administrador(
+                    nombre=nombre,
+                    usuario=usuario_nuevo,
+                    es_superadmin=False
+                )
+                nuevo_admin.password = contrasena
+                db.session.add(nuevo_admin)
+                db.session.commit()
 
-            flash(f"Administrador '{nombre}' creado correctamente", "success")
-            return redirect(url_for("superadmin_home"))
+                flash(f"Administrador '{nombre}' creado correctamente", "success")
+                return redirect(url_for("superadmin_home"))
 
-        return render_template("superadmin/crear_admin.html")
+            except Exception as e:
+                db.session.rollback()
+                flash("Error al crear el administrador", "error")
+                app.logger.error(f"Error en crear_admin: {str(e)}")
+
+        return render_template("superadmin/crear_admin.html", admin_actual=admin_actual)
 
 
+
+    # Actualizar eliminar_admin() - reemplaza tu versión actual con:
     @app.route("/eliminar_admin/<usuario>", methods=["POST"])
     def eliminar_admin(usuario):
-        usuario_actual = session.get("usuario_admin")
-        admin_actual = app.config['ADMINISTRADORES'].get(usuario_actual)
-
-        if not admin_actual or not getattr(admin_actual, "es_superadmin", False):
-            flash("Acceso restringido al superadministrador", "error")
-            return redirect(url_for("login"))
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
         
-        if usuario in app.config['ADMINISTRADORES']:
-            del app.config['ADMINISTRADORES'][usuario]
-            guardar_administradores(app.config['ADMINISTRADORES'])
-            flash("Administrador eliminado correctamente", "success")
+        admin_actual = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        
+        if not admin_actual or not admin_actual.es_superadmin:
+            flash("Acceso restringido", "error")
+            return redirect(url_for('login'))
+
+        admin = Administrador.query.filter_by(usuario=usuario).first()
+        if admin:
+            db.session.delete(admin)
+            db.session.commit()
+            flash("Administrador eliminado", "success")
         else:
             flash("Administrador no encontrado", "error")
-
-        return redirect(url_for("superadmin_home"))
+        
+        return redirect(url_for('superadmin_home'))
 
 
 
     @app.route("/crear_tabla", methods=["GET", "POST"])
     def crear_tabla():
-        if not session.get("usuario_admin"):
-            flash("Por favor, inicia sesión primero.", "error")
-            return redirect(url_for("login"))
-        usuario_actual = session['usuario_admin']
-        admin = app.config['ADMINISTRADORES'].get(usuario_actual)
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
+
+        admin_actual = obtener_admin_actual()
+        if not admin_actual:
+            flash("Administrador no encontrado", "error")
+            return redirect(url_for('login'))
+
         if request.method == "POST":
-            nombre_tabla = request.form.get("nombre_tabla").strip()
-            num_docs = int(request.form.get("num_documentos"))
-            documentos = [request.form.get(f"documento_{i}") for i in range(1, num_docs + 1)]
+            nombre_tabla = request.form.get("nombre_tabla", "").strip()
+            num_docs = int(request.form.get("num_documentos", 0))
+            
+            documentos = [
+                request.form.get(f"documento_{i}", "").strip() 
+                for i in range(1, num_docs + 1)
+                if request.form.get(f"documento_{i}", "").strip()
+            ]
+
             if not nombre_tabla or not documentos:
-                flash("Faltan datos para crear la tabla.", "error")
-                return redirect(url_for("crear_tabla"))
-            nueva_tabla = Tabla(nombre=nombre_tabla, num_documentos=num_docs, creador=usuario_actual)
-            nueva_tabla.documentos = documentos
-            admin.agregar_tabla(nueva_tabla.id)
-            app.config['TABLAS'][nueva_tabla.id] = nueva_tabla
-            guardar_tablas(app.config['TABLAS'])
-            guardar_administradores(app.config['ADMINISTRADORES'])
-            flash(f"Tabla '{nueva_tabla.nombre}' creada y asignada a {admin.nombre}", "success")
-            return redirect(url_for("admin_home"))
-        return render_template("tablas/crear_tabla.html")
+                flash("Nombre y documentos son obligatorios", "error")
+                return redirect(url_for('crear_tabla'))
+
+            try:
+                nueva_tabla = Tabla(
+                        nombre=nombre_tabla,
+                        admin_id=admin_actual.id,
+                        documentos=[Documento(nombre=doc) for doc in documentos]
+                    )
+
+                
+                db.session.add(nueva_tabla)
+                db.session.commit()
+
+                flash(f"Tabla '{nombre_tabla}' creada", "success")
+                return redirect(url_for('admin_home'))
+
+            except Exception as e:
+                db.session.rollback()
+                flash("Error al crear tabla", "error")
+                app.logger.error(f"Error en crear_tabla: {str(e)}")
+
+        return render_template("tablas/crear_tabla.html", admin_actual=admin_actual)
 
 
-    @app.route("/tablas/<id_tabla>")
+
+    @app.route("/tablas/<int:id_tabla>")
     def ver_tabla(id_tabla):
-        tabla = app.config['TABLAS'].get(id_tabla)
-        if not tabla:
-            flash("Tabla no encontrada", "error")
-            return redirect(url_for("admin_home"))
-        return render_template("tablas/ver_tabla.html", tabla=tabla)
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
 
-    @app.route("/eliminar_tabla/<id_tabla>", methods=["POST"])
+        tabla = Tabla.query.options(
+            db.joinedload(Tabla.alumnos).joinedload(Alumno.documentos),
+            db.joinedload(Tabla.documentos)
+        ).get_or_404(id_tabla)
+
+        admin_actual = obtener_admin_actual()
+        if not admin_actual or (admin_actual.id != tabla.admin_id and not admin_actual.es_superadmin):
+            flash("Acceso denegado", "error")
+            return redirect(url_for('admin_home'))
+
+        documentos_requeridos = [doc for doc in tabla.documentos if doc.es_requerido()]
+
+        alumnos_con_docs = []
+        for alumno in tabla.alumnos:
+            alumnos_con_docs.append({
+                'alumno': alumno,
+                'documentos': {doc.nombre: doc for doc in alumno.documentos}
+            })
+
+        return render_template("tablas/ver_tabla.html", 
+                            tabla=tabla,
+                            documentos_requeridos=documentos_requeridos,
+                            alumnos=alumnos_con_docs,
+                            admin_actual=admin_actual)
+
+
+        return render_template("tablas/ver_tabla.html", 
+                            tabla=tabla,
+                            documentos_requeridos=documentos_requeridos,
+                            alumnos=alumnos_con_docs)  # <-- Nueva estructura
+
+    @app.route("/eliminar_tabla/<int:id_tabla>", methods=["POST"])
     def eliminar_tabla(id_tabla):
-        if id_tabla in app.config['TABLAS']:
-            del app.config['TABLAS'][id_tabla]
-            guardar_tablas(app.config['TABLAS'])
-            flash("Tabla eliminada correctamente", "success")
-        else:
-            flash("Tabla no encontrada", "error")
-        return redirect(url_for("admin_home"))
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
+        
+        tabla = Tabla.query.get_or_404(id_tabla)
+        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        
+        if not admin or (admin.id != tabla.admin_id and not admin.es_superadmin):
+            flash("No tienes permisos", "error")
+            return redirect(url_for('admin_home'))
 
+        try:
+            db.session.delete(tabla)
+            db.session.commit()
+            flash("Tabla eliminada", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash("Error crítico al eliminar", "error")
+            app.logger.error(f"Error eliminando tabla {id_tabla}: {str(e)}")
+        
+        return redirect(url_for('admin_home'))
 
-    @app.route("/tablas/<id_tabla>/crear_alumno", methods=["GET", "POST"])
+    @app.route("/tablas/<int:id_tabla>/crear_alumno", methods=["GET", "POST"])
     def crear_alumno(id_tabla):
-        tabla = app.config['TABLAS'].get(id_tabla)
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
+
+        admin_actual = obtener_admin_actual()
+
+        tabla = Tabla.query.get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
-            return redirect(url_for("admin_home"))
+            return redirect(url_for('admin_home'))
+
         if request.method == "POST":
             nombre = request.form.get("nombre", "").strip()
             apellidos = request.form.get("apellidos", "").strip()
-            if not nombre:
-                flash("El nombre es obligatorio", "error")
-                return redirect(url_for("crear_alumno", id_tabla=id_tabla))
-            # Crear el alumno normalmente
-            nuevo_alumno = tabla.crear_alumno(nombre, apellidos)
-            # Asignar la contraseña hasheada
-            nuevo_alumno.password = generar_hash_credencial(nombre, apellidos)
-            guardar_tablas(app.config['TABLAS'])
-            flash(f"Alumno {nombre} {apellidos} creado en {tabla.nombre}", "success")
-            return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-        return render_template("alumnos/crear_alumno.html", tabla=tabla)
+            
+            if not nombre or not apellidos:
+                flash("Nombre y apellidos son obligatorios", "error")
+                return redirect(url_for('crear_alumno', id_tabla=id_tabla))
+
+            try:
+                # Generar un ID único en base al contenido (puedes usar uuid también)
+                alumno_id = hashlib.sha256(f"{nombre}{apellidos}{id_tabla}".encode()).hexdigest()[:32]
+
+                # Crear email temporal/falso si no estás usando uno real
+                email = f"{nombre.lower()}.{apellidos.lower()}@fakemail.com"
+
+                nuevo_alumno = Alumno(
+                    id=alumno_id,
+                    nombre=nombre,
+                    apellidos=apellidos,
+                    email=email,
+                    tabla_id=id_tabla
+                )
+
+                # Contraseña: puedes personalizar esto
+                nuevo_alumno.set_password(f"{nombre}{apellidos}")
+
+                db.session.add(nuevo_alumno)
+                db.session.commit()
+
+                flash(f"Alumno {nombre} {apellidos} creado", "success")
+                return redirect(url_for('ver_tabla', id_tabla=id_tabla))
+            
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error al crear alumno: {e}", "error")
+                app.logger.error(f"Error en crear_alumno: {str(e)}")
+
+        return render_template("alumnos/crear_alumno.html", tabla=tabla, admin_actual=admin_actual)
 
 
     @app.route("/alumno/<alumno_id>", methods=["GET", "POST"])
     def ver_alumno(alumno_id):
-        session.pop("usuario_admin", None)  # Limpia la sesión de administrador
-        for tabla in app.config['TABLAS'].values():
-            for alumno in tabla.alumnos:
-                if alumno.id == alumno_id:
-                    if request.method == "POST" and 'password' in request.form:
-                        input_pwd = request.form.get("password", "")
-                        hash_input = generar_hash_credencial(alumno.nombre, alumno.apellidos)
-                        if input_pwd and hashlib.sha256(input_pwd.encode()).hexdigest() == hash_input:
-                            return render_template("alumnos/subir_documentos.html", alumno=alumno)
-                        else:
-                            flash("Contraseña incorrecta", "error")
-                            return render_template("alumnos/login_alumno.html", alumno=alumno)
-                    if request.method == "POST":
-                        se_subio_algo = False
-                        for nombre_doc in alumno.documentos:
-                            archivo = request.files.get(nombre_doc)
-                            if archivo and archivo.filename:
-                                filename = secure_filename(archivo.filename)
-                                ruta = os.path.join(app.config['UPLOAD_FOLDER'], alumno.id)
-                                os.makedirs(ruta, exist_ok=True)
-                                archivo.save(os.path.join(ruta, filename))
-                                ruta_relativa = os.path.join(ruta, filename)
-                                alumno.subir_documento(nombre_doc, ruta_relativa)
-                                se_subio_algo = True
-                        if se_subio_algo:
-                            guardar_tablas(app.config['TABLAS'])
-                            flash("Documentos subidos correctamente", "success")
-                        else:
-                            flash("No se subió ningún archivo", "error")
-                        return render_template("alumnos/subir_documentos.html", alumno=alumno)
+        session.pop("usuario_admin", None)
+
+        alumno = Alumno.query.options(
+            db.joinedload(Alumno.tabla).joinedload(Tabla.documentos)
+        ).get(alumno_id)
+
+        if not alumno:
+            flash("Alumno no encontrado", "error")
+            return redirect(url_for("login"))
+
+        documentos_requeridos = [
+            doc for doc in alumno.tabla.documentos 
+            if doc.es_requerido()
+        ]
+
+        if request.method == "POST":
+            if 'password' in request.form:
+                input_pwd = request.form.get("password", "")
+                if not alumno.check_password(input_pwd):
+                    flash("Contraseña incorrecta", "error")
                     return render_template("alumnos/login_alumno.html", alumno=alumno)
-        flash("Alumno no encontrado", "error")
-        return redirect(url_for("login"))
+
+            se_subio_algo = False
+            for doc_requerido in documentos_requeridos:
+                archivo = request.files.get(doc_requerido.nombre)
+                if archivo and archivo.filename:
+                    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                    filename = f"{alumno.id}_{doc_requerido.nombre}_{timestamp}{os.path.splitext(archivo.filename)[1]}"
+                    filename = secure_filename(filename)
+
+                    # 🧱 Estructura: /uploads/<tabla_id>/<alumno_id>/
+                    directorio_alumno = os.path.join(
+                        app.config['UPLOAD_FOLDER'],
+                        str(alumno.tabla_id),
+                        alumno.id
+                    )
+                    os.makedirs(directorio_alumno, exist_ok=True)
+
+                    ruta = os.path.join(directorio_alumno, filename)
+
+                    # 🧹 Eliminar documentos anteriores con el mismo nombre
+                    anteriores = Documento.query.filter_by(
+                        alumno_id=alumno.id,
+                        nombre=doc_requerido.nombre
+                    ).all()
+                    for doc in anteriores:
+                        if os.path.exists(doc.ruta):
+                            os.remove(doc.ruta)
+                        db.session.delete(doc)
+
+                    archivo.save(ruta)
+
+                    documento = Documento(
+                        nombre=doc_requerido.nombre,
+                        nombre_archivo=filename,
+                        ruta=ruta,
+                        alumno_id=alumno.id,
+                        tabla_id=alumno.tabla_id,
+                        estado='pendiente'
+                    )
+                    db.session.add(documento)
+                    se_subio_algo = True
+
+            if se_subio_algo:
+                db.session.commit()
+                flash("Documentos subidos correctamente", "success")
+            else:
+                flash("No se subió ningún archivo", "error")
+
+            return render_template("alumnos/subir_documentos.html", 
+                                alumno=alumno,
+                                documentos_requeridos=documentos_requeridos)
+
+        if 'password' not in request.form:
+            return render_template("alumnos/login_alumno.html", alumno=alumno)
+
+        return render_template("alumnos/subir_documentos.html",
+                            alumno=alumno,
+                            documentos_requeridos=documentos_requeridos)
 
 
-
-    @app.route("/tablas/<id_tabla>/eliminar_alumno/<alumno_id>", methods=["POST"])
+    @app.route("/tablas/<int:id_tabla>/eliminar_alumno/<alumno_id>", methods=["POST"])
     def eliminar_alumno(id_tabla, alumno_id):
-        tabla = app.config['TABLAS'].get(id_tabla)
+        if not session.get('usuario_admin'):
+            flash("Acceso no autorizado", "error")
+            return redirect(url_for('login'))
+
+        tabla = Tabla.query.get(id_tabla)
         if not tabla:
             flash("Tabla no encontrada", "error")
-            return redirect(url_for("admin_home"))
-        tabla.alumnos = [a for a in tabla.alumnos if a.id != alumno_id]
-        guardar_tablas(app.config['TABLAS'])
-        flash("Alumno eliminado correctamente", "success")
-        return redirect(url_for("ver_tabla", id_tabla=id_tabla))
+            return redirect(url_for('admin_home'))
+
+        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        if not admin or (admin.id != tabla.admin_id and not admin.es_superadmin):
+            flash("No tienes permisos para esta acción", "error")
+            return redirect(url_for('admin_home'))
+
+        alumno = Alumno.query.get(alumno_id)
+        if not alumno:
+            flash("Alumno no encontrado", "error")
+            return redirect(url_for('ver_tabla', id_tabla=id_tabla))
+
+        try:
+            # 💾 Guardamos el nombre antes de borrar
+            nombre_alumno = alumno.nombre
+
+            # 🧨 Eliminar de la base de datos
+            db.session.delete(alumno)
+            db.session.commit()
+
+            # 🧼 Eliminar carpeta física: /uploads/<tabla_id>/<alumno_id>/
+            carpeta_alumno = os.path.join(
+                app.config['UPLOAD_FOLDER'],
+                str(id_tabla),
+                alumno_id
+            )
+            if os.path.exists(carpeta_alumno):
+                import shutil
+                shutil.rmtree(carpeta_alumno)
+                app.logger.info(f"Carpeta eliminada: {carpeta_alumno}")
+            else:
+                app.logger.info(f"No existe carpeta para borrar: {carpeta_alumno}")
+
+            flash(f"Alumno {nombre_alumno} eliminado correctamente", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash("Error al eliminar el alumno", "error")
+            app.logger.error(f"Error en eliminar_alumno: {str(e)}")
+
+        return redirect(url_for('ver_tabla', id_tabla=id_tabla))
+
+
     
 
     @app.route("/login_alumno", methods=["GET", "POST"])
     def login_alumno():
-        # Solo eliminamos la sesión del admin si está iniciada y no estamos haciendo una acción relevante
+        # Limpiar sesión de admin si existe (para evitar conflictos)
         if request.method == "GET" and session.get("usuario_admin"):
             session.pop("usuario_admin")
+        
         if request.method == "POST":
             credencial = request.form.get("credencial", "").strip().lower()
-            credencial = normalizar(credencial)
-            for tabla in app.config['TABLAS'].values():
-                for alumno in tabla.alumnos:
-                    credencial_alumno = normalizar(alumno.nombre + alumno.apellidos)
-                    if credencial == credencial_alumno:
-                        flash("Login exitoso", "success")
-                        return redirect(url_for("ver_alumno", alumno_id=alumno.id))     
+            if not credencial:
+                flash("Ingrese sus credenciales", "error")
+                return redirect(url_for("login_alumno"))
+            
+            # Generar hash de la credencial (mismo método usado al crear alumnos)
+            credencial_hash = generar_hash_credencial(credencial, "")
+            
+            # Buscar alumno en la base de datos
+            alumno = Alumno.query.filter_by(password_hash=credencial_hash).first()
+            
+            if alumno:
+                flash("Login exitoso", "success")
+                return redirect(url_for("ver_alumno", alumno_id=alumno.id))
+            
             flash("Credencial no válida", "error")
-            return redirect(url_for("login_alumno"))
+        
         return render_template("alumnos/login_alumno.html")
 
 
+    # Actualizar superadmin_home() - reemplaza con:
     @app.route("/superadmin_home")
     def superadmin_home():
-        usuario_actual = session.get("usuario_admin")
-
-        if not usuario_actual or usuario_actual not in app.config['ADMINISTRADORES']:
-            flash("Sesión expirada o inválida. Por favor inicia sesión de nuevo.", "error")
-            return redirect(url_for("login"))
-
-        admin_actual = app.config['ADMINISTRADORES'][usuario_actual]
-
-        if not admin_actual.es_superadmin:
-            flash("Acceso restringido al superadministrador", "error")
-            return redirect(url_for("login"))
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
         
-        lista_admins = list(app.config['ADMINISTRADORES'].values())
-        return render_template("superadmin/superadmin_home.html", admin=admin_actual, lista_admins=lista_admins)
+        admin_actual = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        if not admin_actual or not admin_actual.es_superadmin:
+            flash("Acceso restringido", "error")
+            return redirect(url_for('login'))
 
+        lista_admins = Administrador.query.order_by(Administrador.usuario).all()
+        return render_template("superadmin/superadmin_home.html", 
+                       admin_actual=admin_actual,
+                       lista_admins=lista_admins)
 
 
 
 
     @app.route("/admin_home")
     def admin_home():
-        usuario = session.get('usuario_admin')
-        if not usuario:
+        if not session.get('usuario_admin'):
             flash("Acceso no autorizado", "error")
             return redirect(url_for("login"))
-        admin = app.config['ADMINISTRADORES'].get(usuario)
-        if not admin:
+        
+        admin_actual = obtener_admin_actual()
+        if not admin_actual:
             flash("Administrador no encontrado", "error")
             return redirect(url_for("login"))
-        tablas = [app.config['TABLAS'][tid] for tid in admin.tablas if tid in app.config['TABLAS']]
-        return render_template("admin/home.html", tablas=tablas, admin=admin)
+        
+        if admin_actual.es_superadmin:
+            tablas = Tabla.query.all()
+        else:
+            tablas = Tabla.query.filter_by(admin_id=admin_actual.id).all()
+        
+        return render_template("admin/home.html", 
+                            tablas=tablas, 
+                            admin_actual=admin_actual)
 
 
     @app.route("/ver_admin_home/<admin_nombre>")
     def ver_admin_home(admin_nombre):
-        usuario_actual = session.get('usuario_admin')
-        admin_actual = app.config['ADMINISTRADORES'].get(usuario_actual)
+        # 1. Verificar autenticación y permisos
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
 
-        # Asegura que solo superadmin pueda entrar
+        admin_actual = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        
+        # 2. Solo superadmin puede acceder
         if not admin_actual or not admin_actual.es_superadmin:
-            flash("Acceso restringido.", "error")
-            return redirect(url_for("login"))
+            flash("Acceso restringido: Se requiere superadmin", "error")
+            return redirect(url_for('login'))
 
-        admin = app.config['ADMINISTRADORES'].get(normalizar(admin_nombre))
+        # 3. Buscar admin objetivo
+        admin = Administrador.query.filter_by(usuario=normalizar(admin_nombre)).first()
         if not admin:
             flash("Administrador no encontrado", "error")
-            return redirect(url_for("superadmin_home"))
+            return redirect(url_for('superadmin_home'))
 
-        tablas = [
-            tabla for tabla in app.config['TABLAS'].values()
-            if hasattr(tabla, 'creador') and tabla.creador == admin.usuario
-        ]
-        admin.tablas = [tabla.id for tabla in tablas]
+        # 4. Obtener tablas del admin
+        tablas = Tabla.query.filter_by(admin_id=admin.id).all()
 
-        # Muestra la vista del admin sin alterar la sesión original
-        return render_template("admin/home.html", tablas=tablas, admin=admin)
+        # 5. Renderizar vista
+        return render_template("admin/home.html",
+                       tablas=tablas,
+                       admin_actual=admin, 
+                       es_vista_externa=True)
 
 
+    @app.route("/descargar/<int:doc_id>")
+    def descargar_documento(doc_id):
+      
+        # 1. Buscar documento por ID único
+        documento = Documento.query.get(doc_id)
+        if not documento:
+            flash("Documento no encontrado", "error")
+            return redirect(url_for("login"))
 
-    @app.route("/descargar/<alumno_id>/<documento>")
-    def descargar_documento(alumno_id, documento):
-        for tabla in app.config['TABLAS'].values():
-            for alumno in tabla.alumnos:
-                if alumno.id == alumno_id:
-                    if documento in alumno.documentos:
-                        ruta = alumno.documentos[documento]["ruta"]
-                        if ruta and os.path.exists(ruta):
-                            print(f"Enviando archivo desde: {ruta}")
-                            return send_file(ruta, as_attachment=True)
-        flash("Documento no encontrado", "error")
-        return redirect(url_for("login"))
+        # 2. Verificar archivo físico
+        if not documento.ruta or not os.path.exists(documento.ruta):
+            flash("El archivo no está disponible", "error")
+            app.logger.error(f"Archivo faltante: {documento.ruta}")
+            return redirect(url_for("login"))
+
+        # 3. Descargar archivo con nombre original
+        extension = os.path.splitext(documento.nombre_archivo)[1]
+        return send_file(
+            documento.ruta,
+            as_attachment=True,
+            download_name=f"{documento.nombre}{extension}"  # Ej: "Certificado Médico.pdf"
+        )
     
 
 
-    @app.route("/eliminar_documento/<alumno_id>/<documento>", methods=["POST"])
-    def eliminar_documento(alumno_id, documento):
-        for tabla in app.config['TABLAS'].values():
-            for alumno in tabla.alumnos:
-                if alumno.id == alumno_id:
-                    doc_info = alumno.documentos.get(documento)
-                    if doc_info and doc_info["ruta"]:
-                        ruta = doc_info["ruta"]
-                        if os.path.exists(ruta):
-                            os.remove(ruta)
-                        alumno.eliminar_documento(documento)  
-                        guardar_tablas(app.config['TABLAS'])
-                        flash(f"Documento '{documento}' eliminado", "success")
-                    else:
-                        flash("Documento no encontrado o no subido", "error")
-                    return render_template("alumnos/subir_documentos.html", alumno=alumno)
-        flash("Alumno no encontrado", "error")
-        return redirect(url_for("login_alumno"))
+    @app.route("/eliminar_documento/<int:doc_id>", methods=["POST"])
+    def eliminar_documento(doc_id):
+        # 1. Buscar documento por ID (más seguro que por nombre)
+        documento = Documento.query.get(doc_id)
+        if not documento:
+            flash("Documento no encontrado", "error")
+            return redirect(url_for("login_alumno"))
 
+        # 2. Obtener alumno asociado
+        alumno = Alumno.query.get(documento.alumno_id)
+        if not alumno:
+            flash("Alumno no encontrado", "error")
+            return redirect(url_for("login_alumno"))
 
-    @app.route("/tabla/<id_tabla>/añadir_documento", methods=["POST"])
+        try:
+            # 3. Eliminar archivo físico si existe
+            if documento.ruta and os.path.exists(documento.ruta):
+                os.remove(documento.ruta)
+                app.logger.info(f"Archivo eliminado: {documento.ruta}")
+
+            # 4. Eliminar registro de la base de datos
+            db.session.delete(documento)
+            db.session.commit()
+
+            flash(f"Documento '{documento.nombre}' eliminado correctamente", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash("Error al eliminar el documento", "error")
+            app.logger.error(f"Error eliminando documento: {str(e)}")
+
+        # 5. Obtener documentos requeridos actualizados
+        documentos_requeridos = Documento.query.filter_by(
+            tabla_id=alumno.tabla_id,
+            alumno_id=None
+        ).all()
+
+        # 6. Redirigir a la vista de subida
+        return render_template("alumnos/subir_documentos.html",
+                            alumno=alumno,
+                            documentos_requeridos=documentos_requeridos)
+
+    @app.route("/tabla/<int:id_tabla>/añadir_documento", methods=["POST"])
     def añadir_documento(id_tabla):
-        tabla = app.config['TABLAS'].get(id_tabla)
-        if not tabla:
-            flash("Tabla no encontrada", "error")
-            return redirect(url_for("admin_home"))
+        # 1. Authentication and permissions
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
+        
+        # 2. Get table with optimized query
+        tabla = Tabla.query.options(
+            db.joinedload(Tabla.documentos)
+        ).get_or_404(id_tabla)
+        
+        # 3. Verify admin permissions
+        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        if not admin or (admin.id != tabla.admin_id and not admin.es_superadmin):
+            flash("No tienes permisos para modificar esta tabla", "error")
+            return redirect(url_for('admin_home'))
+
+        # 4. Process and validate document name
         nuevo_doc = request.form.get("nuevo_documento", "").strip()
         nuevo_doc = re.sub(r"[^a-zA-Z0-9_ñÑáéíóúÁÉÍÓÚ\s]", "", nuevo_doc).strip()
+        
         if not nuevo_doc:
-            flash("Nombre del documento vacío o inválido", "error")
+            flash("Nombre del documento inválido", "error")
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-        if nuevo_doc in tabla.documentos:
-            flash("Ese documento ya existe en esta tabla", "error")
+            
+        # 5. Check if document already exists (now using Documento model)
+        if Documento.query.filter_by(
+            tabla_id=id_tabla,
+            nombre=nuevo_doc,
+            alumno_id=None  # Only check required docs (not student uploads)
+        ).first():
+            flash("Este documento ya existe en la tabla", "error")
             return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-        tabla.documentos.append(nuevo_doc)
-        for alumno in tabla.alumnos:
-            if nuevo_doc not in alumno._documentos:
-                alumno._documentos[nuevo_doc] = {"estado": False, "ruta": None}
-        guardar_tablas(app.config['TABLAS'])
-        flash(f"Documento '{nuevo_doc}' añadido a la tabla", "success")
+
+        try:
+            # 6. Create new required document (alumno_id=None marks it as required)
+            documento = Documento(
+                nombre=nuevo_doc,
+                tabla_id=id_tabla,
+                alumno_id=None,  # This makes it a required document
+                estado='requerido'  # Optional: add status for required docs
+            )
+            
+            db.session.add(documento)
+            db.session.commit()
+            
+            flash(f"Documento '{nuevo_doc}' añadido correctamente", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash("Error al añadir el documento", "error")
+            app.logger.error(f"Error en añadir_documento: {str(e)}")
+        
         return redirect(url_for("ver_tabla", id_tabla=id_tabla))
 
-
-    @app.route("/tabla/<id_tabla>/eliminar_documento/<nombre_doc>", methods=["POST"])
+    @app.route("/tabla/<int:id_tabla>/eliminar_documento/<string:nombre_doc>", methods=["POST"])
     def eliminar_documento_tabla(id_tabla, nombre_doc):
-        tabla = app.config['TABLAS'].get(id_tabla)
-        if not tabla:
-            flash("Tabla no encontrada", "error")
-            return redirect(url_for("admin_home"))
-        if nombre_doc not in tabla.documentos:
-            flash("Documento no encontrado", "error")
-            return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-        # Eliminar el documento de la tabla
-        tabla.documentos.remove(nombre_doc)
-        # Eliminar el documento de los alumnos
-        for alumno in tabla.alumnos:
-            if nombre_doc in alumno._documentos:
-                del alumno._documentos[nombre_doc]
-        guardar_tablas(app.config["TABLAS"])
-        flash(f"Documento '{nombre_doc}' eliminado de la tabla y de los alumnos", "success")
+        # 1. Authentication check
+        if not session.get('usuario_admin'):
+            return redirect(url_for('login'))
+        
+        # 2. Get the required document (where alumno_id is NULL)
+        documento = Documento.query.filter_by(
+            tabla_id=id_tabla,
+            nombre=nombre_doc,
+            alumno_id=None  # This ensures we only get required docs
+        ).first_or_404()
+        
+        # 3. Verify admin permissions
+        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
+        if not admin or (admin.id != documento.tabla.admin_id and not admin.es_superadmin):
+            flash("No tienes permisos para esta acción", "error")
+            return redirect(url_for('admin_home'))
+
+        try:
+            # 4. Delete the document and related student uploads (cascade)
+            db.session.delete(documento)
+            db.session.commit()
+            
+            flash(f"Documento '{nombre_doc}' eliminado correctamente", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash("Error al eliminar el documento", "error")
+            app.logger.error(f"Error en eliminar_documento_tabla: {str(e)}")
+        
         return redirect(url_for("ver_tabla", id_tabla=id_tabla))
-
-
-
 
     return app
 

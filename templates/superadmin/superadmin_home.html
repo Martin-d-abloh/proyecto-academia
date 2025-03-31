@@ -4,45 +4,42 @@
 <div class="container">
     <h2>Panel del Superadministrador</h2>
 
-    <!-- Botón de Logout -->
-    <a href="{{ url_for('logout_admin') }}">
-        <button>Cerrar sesión</button>
-    </a>
-
-    <!-- Solo visible para superadmin (siempre será visible aquí) -->
-    <a href="{{ url_for('crear_admin') }}">
-        <button>Crear nuevo administrador</button>
-    </a>
+    <!-- Botones de acción -->
+    <div class="mb-3">
+        <a href="{{ url_for('logout_admin') }}" class="btn btn-secondary">Cerrar sesión</a>
+        <a href="{{ url_for('crear_admin') }}" class="btn btn-primary">➕ Crear nuevo administrador</a>
+    </div>
 
     <h3>Administradores registrados:</h3>
-    <ul>
-        {% for admin in lista_admins %}
-            <li>
-                <span>{{ admin.nombre }}</span>
+    {% if lista_admins %}
+        <ul class="list-group">
+            {% for admin in lista_admins %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ admin.nombre }}</span>
 
-                <!-- Botón de redirección sin JS embebido -->
-                <button class="ver-admin" data-url="{{ url_for('ver_admin_home', admin_nombre=admin.usuario) }}">Ver</button>
+                    <div>
+                        <!-- Redirección a vista del admin -->
+                        <a href="{{ url_for('ver_admin_home', admin_nombre=admin.usuario) }}" class="btn btn-sm btn-info">
+                            Ver
+                        </a>
 
-                {% if not admin.es_superadmin %}
-                    <form action="{{ url_for('eliminar_admin', usuario=admin.usuario) }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                    </form>
-                {% endif %}
-            </li>
-        {% else %}
-            <p>No hay administradores registrados aún.</p>
-        {% endfor %}
-    </ul>
+                        {% if not admin.es_superadmin %}
+                            <form action="{{ url_for('eliminar_admin', usuario=admin.usuario) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                        onclick="return confirm('¿Eliminar este administrador?')">
+                                    🗑️ Eliminar
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="alert alert-warning mt-3">
+            No hay administradores registrados aún.
+        </div>
+    {% endif %}
 </div>
 
-<!-- Script para manejar la redirección limpia -->
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll(".ver-admin").forEach(btn => {
-            btn.addEventListener("click", () => {
-                window.location.href = btn.dataset.url;
-            });
-        });
-    });
-</script>
 {% endblock %}

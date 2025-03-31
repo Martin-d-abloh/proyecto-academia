@@ -1,50 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>Subir documentos para {{ alumno.nombre }} {{ alumno.apellidos }}</h1>
-
-    <form method="POST" enctype="multipart/form-data">
-        {% if alumno.todo_bien %}
-        <p style="color: green; font-weight: bold;">
-            ✅ Ya has subido todos los documentos. Si lo necesitas, puedes volver a subirlos.
-        </p>
-    {% endif %}
+    <h1>{{ alumno.nombre }} {{ alumno.apellidos }}</h1>
     
-        <ul>
-            {% for nombre_doc, info in alumno.documentos.items() %}
-                <li>
-                    <label>{{ nombre_doc }}:</label>
-
-                    {% if info.estado %}
-                        ✅ Subido
-
-                        <!-- Botón de descarga -->
-                        <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=nombre_doc) }}">Descargar</a>
-                    {% else %}
-                        <input type="file" 
-                               name="{{ nombre_doc }}" 
-                               accept=".pdf,.doc,.jpg,.jpeg,.png"
-                               autocomplete="off">
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-
-        <button type="submit">Subir documentos</button>
-    </form>
-
-    <!-- Formularios de eliminación fuera del form principal -->
-    <ul>
-        {% for nombre_doc, info in alumno.documentos.items() if info.estado %}
-            <li style="margin-top: 10px;">
-                <form action="{{ url_for('eliminar_documento', alumno_id=alumno.id, documento=nombre_doc) }}"
-                      method="POST"
-                      onsubmit="return confirm('¿Seguro que quieres eliminar este archivo?')"
-                      style="display:inline;">
-                    <button type="submit" style="background:none; border:none; cursor:pointer;">
-                        🗑️ Eliminar {{ nombre_doc }}
-                    </button>
-                </form>
-            </li>
+    <h2>Documentos:</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {% for doc in documentos_requeridos %}
+            <div style="margin-bottom: 15px;">
+                <h3>{{ doc.nombre }}</h3>
+                {% set doc_subido = alumno.documentos_subidos|selectattr('nombre_documento', 'equalto', doc.nombre)|first %}
+                {% if doc_subido %}
+                    <p>Estado: {% if doc_subido.estado_validacion %}✅ Validado{% else %}🔄 Pendiente{% endif %}</p>
+                    <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc.nombre) }}" 
+                       class="button">
+                       📥 Descargar
+                    </a>
+                {% else %}
+                    <input type="file" name="{{ doc.nombre }}">
+                {% endif %}
+            </div>
         {% endfor %}
-    </ul>
+        <button type="submit" class="btn-primary">Subir documentos</button>
+    </form>
 {% endblock %}

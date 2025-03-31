@@ -9,7 +9,6 @@
     <div class="container">
         <nav class="nav-bar">
             {% if session.get('usuario_admin') %}
-                {% set admin_actual = config['ADMINISTRADORES'].get(session.get('usuario_admin')) %}
                 {% if admin_actual and admin_actual.es_superadmin %}
                     <a href="{{ url_for('superadmin_home') }}" class="nav-link">Inicio</a>
                 {% else %}
@@ -28,4 +27,5 @@
 
         {% block content %}{% endblock %}
     </div>
-</body
+</body>
+</html>

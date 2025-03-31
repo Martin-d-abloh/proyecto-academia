@@ -1,141 +1,88 @@
-# -*- coding: utf-8 -*-
-"""
-Módulo optimizado para gestión de tablas y alumnos con documentos académicos.
-"""
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from database import db
+from werkzeug.utils import secure_filename
+import uuid
 
-from uuid import uuid4
-from typing import List, Dict, Optional
-import os
+class Administrador(db.Model):
+    __tablename__ = 'administradores'
 
-#-------------------------------------------------------------------------------
-# CLASE TABLA 
-#-------------------------------------------------------------------------------
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    usuario = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    es_superadmin = db.Column(db.Boolean, default=False)
 
-class Tabla:
-    """
-    Gestiona grupos de alumnos y sus documentos requeridos.
+    tablas = db.relationship('Tabla', backref='administrador', cascade='all, delete-orphan')
 
-    Optimizaciones clave:
-    - Añadido campo 'creador' para asociar la tabla a un administrador
-    - Validación de nombre en constructor
-    - Mejor gestión de memoria con __slots__
-    """
-    __slots__ = ('nombre', 'id', 'documentos', 'alumnos', 'creador')
+    @property
+    def password(self):
+        raise AttributeError("La contraseña no se puede leer directamente")  # <- esta línea estaba mal indentada
 
-    def __init__(self, nombre: str, num_documentos: int = 0, documentos: Optional[List[str]] = None, creador: str = "") -> None:
-        if not nombre.strip():
-            raise ValueError("El nombre de la tabla no puede estar vacío")
+    @password.setter
+    def password(self, password):
+        self.password_hash = generate_password_hash(password)
 
-        self.nombre = nombre.strip()
-        self.id = uuid4().hex
-        self.documentos = documentos if documentos else [f"Documento {i+1}" for i in range(max(num_documentos, 0))]
-        self.alumnos: List['Alumno'] = []
-        self.creador = creador
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
-    def crear_alumno(self, nombre: str, apellidos: str) -> 'Alumno':
-        """Crea alumno asegurando datos válidos y documentos únicos."""
-        nombre = nombre.strip()
-        apellidos = apellidos.strip()
 
-        if not nombre:
-            raise ValueError("Nombre del alumno requerido")
-
-        nuevo_alumno = Alumno(
-            nombre=nombre,
-            apellidos=apellidos,
-            documentos=list(dict.fromkeys(self.documentos))
-        )
-
-        self.alumnos.append(nuevo_alumno)
-        return nuevo_alumno
-
-    def __repr__(self) -> str:
-        return f"<Tabla {self.nombre} | Docs: {len(self.documentos)} | Alumnos: {len(self.alumnos)}>"
-
-#-------------------------------------------------------------------------------
-# CLASE ALUMNO 
-#-------------------------------------------------------------------------------
-
-class Alumno:
+class Tabla(db.Model):
+    """Hoja de cálculo con requisitos (columnas) y alumnos (filas)"""
+    __tablename__ = 'tablas'
     
-    __slots__ = ('_id', 'nombre', 'apellidos', '_documentos', '_estado_general', 'password')
-
-    def __init__(self, nombre: str, apellidos: str, documentos: List[str]):
-        self.nombre = nombre.strip()
-        self.apellidos = apellidos.strip()
-        self._id = uuid4().hex
-        self._documentos = {doc: {'estado': False, 'ruta': None} for doc in documentos}
-        self._estado_general = False
-        self.password = ""  # Placeholder para la contraseña
-
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def link(self) -> str:
-        return f"/alumno/{self._id}"
-
-    @property
-    def todo_bien(self) -> bool:
-        return all(doc['estado'] for doc in self._documentos.values())
-
-
-    def subir_documento(self, nombre_doc: str, ruta: str) -> bool:
-        if nombre_doc in self._documentos:
-            self._documentos[nombre_doc] = {'estado': True, 'ruta': ruta}
-            self._estado_general = False
-            return True
-        return False
-
-    @property
-    def documentos(self) -> Dict[str, Dict]:
-        return self._documentos.copy()
-
-    def __repr__(self) -> str:
-        estado = 'OK' if self.todo_bien else 'Pendiente'
-        return f"<Alumno {self.nombre} | Docs: {self._documentos.keys()} | {estado}>"
-
-    def eliminar_documento(self, nombre_doc: str) -> bool:
-        if nombre_doc in self._documentos:
-            self._documentos[nombre_doc]["estado"] = False
-            self._documentos[nombre_doc]["ruta"] = None
-            self._estado_general = False  # Forzar recalculado
-            return True
-        return False
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.Text)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('administradores.id'), nullable=False)
     
-    def eliminar_documento(self, nombre_doc: str) -> bool:
-        if nombre_doc in self._documentos:
-            self._documentos[nombre_doc]["estado"] = False
-            self._documentos[nombre_doc]["ruta"] = None
-            self._estado_general = False  # ⚠️ Invalida la caché
-            return True
-        return False
+    # Componentes de la tabla
+    alumnos = db.relationship('Alumno', backref='tabla', cascade='all, delete-orphan')
+    documentos = db.relationship("Documento", backref="tabla", cascade="all, delete-orphan")
 
 
 
-#-------------------------------------------------------------------------------
-# CLASE ADMINISTRADOR 
-# -------------------------------------------------------------------------------
+class Alumno(db.Model):
+    """Usuario que sube documentos para cumplir requisitos (fila en la tabla)"""
+    __tablename__ = 'alumnos'
+    
+    id = db.Column(db.String(32), primary_key=True, default=lambda: str(uuid.uuid4()))
+    nombre = db.Column(db.String(50), nullable=False)
+    apellidos = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
+    
+    # Documentos subidos por este alumno
+    documentos = db.relationship('Documento', backref='alumno', cascade='all, delete-orphan')
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
-class Administrador:
-    def __init__(self, nombre, usuario, contrasena):
-        self.nombre = nombre
-        self.usuario = usuario
-        self.contrasena = contrasena
-        self.tablas = []  # Aquí se guardan los IDs de las tablas
-
-    def crear_tabla(self, nombre_tabla, documentos):
-        nueva_tabla = Tabla(nombre=nombre_tabla, documentos=documentos, creador=self.usuario)
-        self.tablas.append(nueva_tabla.id)  # Guardamos el ID, no la instancia completa
-        return nueva_tabla
-
-    def agregar_tabla(self, id_tabla):
-        """Asigna una tabla al administrador (por ID)."""
-        self.tablas.append(id_tabla)
-    @property
-    def es_superadmin(self):
-        print("Comparando:", self.usuario, os.getenv("SUPERADMIN_USUARIO"))
-        return self.usuario == os.getenv("SUPERADMIN_USUARIO", "adminroot")
-
+class Documento(db.Model):
+    """Modelo unificado para TODOS los documentos: requeridos y subidos por alumnos"""
+    __tablename__ = 'documentos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Metadatos comunes
+    nombre = db.Column(db.String(255), nullable=False)  # Ej: "Certificado médico"
+    descripcion = db.Column(db.Text)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Para documentos subidos por alumnos:
+    nombre_archivo = db.Column(db.String(255), unique=True)  # Ej: "alumno1_certificado.pdf"
+    ruta = db.Column(db.String(512))  # Ruta física en el servidor
+    estado = db.Column(db.String(20), default='pendiente')  # pendiente/aceptado/rechazado
+    
+    # Relaciones
+    tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)  # A qué tabla pertenece
+    alumno_id = db.Column(db.Integer, db.ForeignKey('alumnos.id'))  # NULL si es solo un requisito
+    
+    # Métodos
+    def es_requerido(self):
+        return self.alumno_id is None
