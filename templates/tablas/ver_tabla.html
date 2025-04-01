@@ -1,81 +1,82 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>{{ tabla.nombre }}</h1>
-    
-    <!-- Botón para crear nuevo alumno -->
-    <a href="{{ url_for('crear_alumno', id_tabla=tabla.id) }}">
-        <button>Crear nuevo alumno</button>
-    </a>
+<h1>{{ tabla.nombre }}</h1>
 
-    <h2>Alumnos:</h2>
+<!-- Botón para crear nuevo alumno -->
+<a href="{{ url_for('crear_alumno', id_tabla=tabla.id) }}">
+    <button>Crear nuevo alumno</button>
+</a>
 
-    {% if tabla.alumnos %}
-        <table border="1" cellpadding="6" cellspacing="0">
-            <thead>
+<h2>Alumnos:</h2>
+
+{% if tabla.alumnos %}
+    <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                {% for doc in tabla.documentos if doc.alumno_id is none %}
+                    <th>
+                        {{ doc.nombre }}
+                        <!-- Botón de eliminar documento -->
+                        <form method="POST" action="{{ url_for('eliminar_documento_tabla_id', id_tabla=tabla.id, doc_id=doc.id) }}" style="margin-top: 5px;">
+                            <button type="submit" style="font-size: 10px;" onclick="return confirm('¿Eliminar este documento de toda la tabla?')">🗑️</button>
+                        </form>
+                    </th>
+                {% endfor %}
+                <th>Estado general</th>
+                <th>Link único</th>
+                <th>Eliminar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alumno in tabla.alumnos %}
                 <tr>
-                    <th>Nombre</th>
-                    {% for doc in tabla.documentos_requeridos %}
-                        <th>
-                            {{ doc.nombre }}
-                            <!-- Botón de eliminar documento -->
-                            <form method="POST" action="{{ url_for('eliminar_documento_tabla', id_tabla=tabla.id, nombre_doc=doc.nombre) }}" style="margin-top: 5px;">
-                                <button type="submit" style="font-size: 10px;" onclick="return confirm('¿Eliminar este documento de toda la tabla?')">🗑️</button>
-                            </form>
-                        </th>
-                    {% endfor %}
-                    <th>Estado general</th>
-                    <th>Link único</th>
-                    <th>Eliminar</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for alumno in tabla.alumnos %}
-                    <tr>
-                        <td>{{ alumno.nombre }} {{ alumno.apellidos }}</td>
-                        {% for doc in tabla.documentos_requeridos %}
-                            {% set doc_subido = alumno.documentos_subidos|selectattr('nombre_documento', 'equalto', doc.nombre)|first %}
-                            <td>
-                                {% if doc_subido %}
-                                    {% if doc_subido.estado_validacion %}
-                                        ✅
-                                        <br>
-                                        <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc.nombre) }}">📥 Descargar</a>
-                                    {% else %}
-                                        ❌ (Subido)
-                                    {% endif %}
-                                {% else %}
-                                    ❌
-                                {% endif %}
-                            </td>
-                        {% endfor %}
+                    <td>{{ alumno.nombre }} {{ alumno.apellidos }}</td>
+                    {% for doc in tabla.documentos if doc.alumno_id is none %}
+                        {% set doc_subido = alumno.documentos | selectattr('nombre', 'equalto', doc.nombre) | first %}
                         <td>
-                            {% if alumno.documentos_subidos|length == tabla.documentos_requeridos|length %}
-                                ✅
+                            {% if doc_subido %}
+                                {% if doc_subido.estado == 'aceptado' %}
+                                    ✅ Validado
+                                {% elif doc_subido.estado == 'subido' %}
+                                    🔄 Subido
+                                {% else %}
+                                    ❌ Rechazado
+                                {% endif %}
+                                <br>
+                                <a href="{{ url_for('descargar_documento', doc_id=doc_subido.id) }}">📥 Descargar</a>
                             {% else %}
-                                ❌
+                                ❌ No entregado
                             {% endif %}
                         </td>
-                        <td>
-                            <a href="{{ url_for('ver_alumno', alumno_id=alumno.id) }}">Acceder</a>
-                        </td>
-                        <td>
-                            <form method="POST" action="{{ url_for('eliminar_alumno', id_tabla=tabla.id, alumno_id=alumno.id) }}">
-                                <button type="submit" onclick="return confirm('¿Eliminar este alumno?')">🗑️</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endfor %}
+                    <td>
+                        {% if alumno.documentos | selectattr('alumno_id', 'equalto', alumno.id) | list | length >= tabla.documentos | selectattr('alumno_id', 'equalto', None) | list | length %}
+                            ✅
+                        {% else %}
+                            ❌
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('ver_alumno', alumno_id=alumno.id) }}">Acceder</a>
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('eliminar_alumno', id_tabla=tabla.id, alumno_id=alumno.id) }}">
+                            <button type="submit" onclick="return confirm('¿Eliminar este alumno?')">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
-        <!-- Formulario para añadir nuevo documento -->
-        <h3>Añadir nuevo documento a esta tabla:</h3>
-        <form method="POST" action="{{ url_for('añadir_documento', id_tabla=tabla.id) }}">
-            <input type="text" name="nuevo_documento" placeholder="Nombre del nuevo documento" required>
-            <button type="submit">Añadir documento</button>
-        </form>
-
-    {% else %}
-        <p>No hay alumnos registrados.</p>
-    {% endif %}
+    <!-- Formulario para añadir nuevo documento -->
+    <h3>Añadir nuevo documento a esta tabla:</h3>
+    <form method="POST" action="{{ url_for('añadir_documento', id_tabla=tabla.id) }}">
+        <input type="text" name="nuevo_documento" placeholder="Nombre del nuevo documento" required>
+        <button type="submit">Añadir documento</button>
+    </form>
+{% else %}
+    <p>No hay alumnos registrados.</p>
+{% endif %}
 {% endblock %}

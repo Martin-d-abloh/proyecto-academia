@@ -13,6 +13,14 @@
         {% endif %}
     {% endwith %}
 
+    {% if session.get('usuario_alumno') %}
+        <div class="alert alert-warning">
+            Ya tienes una sesión activa. 
+            <a href="{{ url_for('logout_alumno') }}">Cerrar sesión</a> o
+            <a href="{{ url_for('ver_alumno', alumno_id=session['usuario_alumno']) }}">Continuar</a>
+        </div>
+    {% endif %}
+
     <div class="card">
         <div class="card-body">
             <p class="text-muted">

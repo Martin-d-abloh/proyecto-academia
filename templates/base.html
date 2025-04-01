@@ -1,4 +1,3 @@
-<!-- templates/base.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,16 +6,30 @@
 </head>
 <body>
     <div class="container">
+
         <nav class="nav-bar">
             {% if session.get('usuario_admin') %}
                 {% if admin_actual and admin_actual.es_superadmin %}
                     <a href="{{ url_for('superadmin_home') }}" class="nav-link">Inicio</a>
-                {% else %}
-                    <a href="{{ url_for('admin_home') }}" class="nav-link">Inicio</a>
                 {% endif %}
+                <a href="{{ url_for('admin_home') }}" class="nav-link">Inicio admin</a>
+        
+                {% if admin_actual and admin_actual.es_superadmin %}
+                    <a href="{{ url_for('logout_superadmin') }}" class="nav-link">Cerrar sesión</a>
+                {% else %}
+                    <a href="{{ url_for('logout_admin') }}" class="nav-link">Cerrar sesión</a>
+                {% endif %}
+        
+            {% elif session.get('usuario_alumno') %}
+                <div class="alert alert-info">
+                    Sesión iniciada como: <strong>{{ session.get('alumno_nombre') }}</strong>
+                    <a href="{{ url_for('logout_alumno') }}" class="float-right">Cerrar sesión</a>
+                </div>
             {% endif %}
         </nav>
         
+
+        <!-- Mensajes flash -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -25,7 +38,48 @@
             {% endif %}
         {% endwith %}
 
+        <!-- Contenido de la vista -->
         {% block content %}{% endblock %}
+
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.btn-eliminar').forEach(btn => {
+                btn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+        
+                    const docId = this.dataset.docId;
+                    const div = this.closest('div');
+                    const nombreDoc = div.querySelector('h3').innerText;
+        
+                    if (confirm('¿Estás seguro de que deseas eliminar este documento?')) {
+                        fetch(`/eliminar_documento/${docId}`, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(res => {
+                            if (res.ok) {
+                                // Reemplazamos el contenido del div con input de subida
+                                div.innerHTML = `
+                                    <h3>${nombreDoc}</h3>
+                                    <p>Estado: No subido</p>
+                                    <input type="file" name="documento_${docId}">
+                                `;
+                            } else {
+                                alert('Error al eliminar el documento.');
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+        
+        
+
 </body>
 </html>

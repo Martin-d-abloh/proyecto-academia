@@ -3,6 +3,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database import db
 from werkzeug.utils import secure_filename
 import uuid
+import hashlib
+import os
+from flask_sqlalchemy import SQLAlchemy
+from flask import Flask
 
 class Administrador(db.Model):
     __tablename__ = 'administradores'
@@ -49,8 +53,8 @@ class Alumno(db.Model):
     
     id = db.Column(db.String(32), primary_key=True, default=lambda: str(uuid.uuid4()))
     nombre = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), nullable=False) 
     apellidos = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
     
@@ -58,10 +62,13 @@ class Alumno(db.Model):
     documentos = db.relationship('Documento', backref='alumno', cascade='all, delete-orphan')
     
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = hashlib.sha256(password.encode()).hexdigest()
+
     
     def check_password(self, password):
+        """Verifica si la contraseña introducida es correcta."""
         return check_password_hash(self.password_hash, password)
+
 
 class Documento(db.Model):
     """Modelo unificado para TODOS los documentos: requeridos y subidos por alumnos"""

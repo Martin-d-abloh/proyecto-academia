@@ -1,21 +1,36 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>{{ alumno.nombre }} {{ alumno.apellidos }}</h1>
-    
+
     <h2>Documentos:</h2>
-    <form method="POST" enctype="multipart/form-data">
+
+    <form method="POST" action="{{ url_for('subir_documentos', alumno_id=alumno.id) }}" enctype="multipart/form-data">
         {% for doc in documentos_requeridos %}
             <div style="margin-bottom: 15px;">
                 <h3>{{ doc.nombre }}</h3>
-                {% set doc_subido = alumno.documentos_subidos|selectattr('nombre_documento', 'equalto', doc.nombre)|first %}
+                {% set doc_subido = documentos_subidos | selectattr('nombre', 'equalto', doc.nombre) | first %}
+
                 {% if doc_subido %}
-                    <p>Estado: {% if doc_subido.estado_validacion %}✅ Validado{% else %}🔄 Pendiente{% endif %}</p>
-                    <a href="{{ url_for('descargar_documento', alumno_id=alumno.id, documento=doc.nombre) }}" 
-                       class="button">
-                       📥 Descargar
+                    <p>Estado: 
+                        {% if doc_subido.estado == 'aceptado' %}✅ Validado
+                        {% elif doc_subido.estado == 'subido' %}✅ Subido
+                        {% else %}❌ Rechazado
+                        {% endif %}
+                    </p>
+
+                    <a href="{{ url_for('descargar_documento', doc_id=doc_subido.id) }}" class="button">
+                        📥 Descargar
                     </a>
+
+                    <button 
+                        type="button" 
+                        class="btn-eliminar" 
+                        data-doc-id="{{ doc_subido.id }}">
+                        🗑️ Eliminar
+                    </button>
                 {% else %}
-                    <input type="file" name="{{ doc.nombre }}">
+                    <p>Estado: No subido</p>
+                    <input type="file" name="documento_{{ doc.id }}">
                 {% endif %}
             </div>
         {% endfor %}
