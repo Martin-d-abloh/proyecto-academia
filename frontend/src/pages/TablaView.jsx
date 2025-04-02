@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 function Login({ tipo = 'alumno' }) {
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
-
   const esAdmin = tipo === 'admin'
   const navigate = useNavigate()
 
@@ -16,17 +15,14 @@ function Login({ tipo = 'alumno' }) {
     try {
       const res = await fetch(`http://localhost:5001${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // ✅ NECESARIO PARA RECIBIR COOKIES DE SESIÓN
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // ✅ NECESARIO
         body: JSON.stringify({ usuario, contrasena: password }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        // ✅ Redirección según tipo de usuario
         if (tipo === 'admin') {
           if (data.es_superadmin) {
             navigate('/superadmin')
@@ -34,15 +30,14 @@ function Login({ tipo = 'alumno' }) {
             navigate('/admin')
           }
         } else {
-          // Alumnos: se podría ajustar según cómo manejes su vista
           navigate(`/alumno/${usuario}`)
         }
       } else {
-        alert(`❌ ${data.error || 'Credenciales incorrectas'}`)
+        alert('❌ Credenciales incorrectas')
       }
     } catch (error) {
-      console.error(error)
       alert('⚠️ Error al conectar con el servidor')
+      console.error(error)
     }
   }
 

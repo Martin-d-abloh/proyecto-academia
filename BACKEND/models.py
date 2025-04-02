@@ -57,7 +57,8 @@ class Alumno(db.Model):
     apellidos = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
-    
+    credencial = db.Column(db.String(64), unique=True)  
+
     # Documentos subidos por este alumno
     documentos = db.relationship('Documento', backref='alumno', cascade='all, delete-orphan')
     
