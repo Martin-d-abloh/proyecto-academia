@@ -21,7 +21,7 @@ class Administrador(db.Model):
 
     @property
     def password(self):
-        raise AttributeError("La contraseña no se puede leer directamente")  # <- esta línea estaba mal indentada
+        raise AttributeError("La contraseña no se puede leer directamente")  
 
     @password.setter
     def password(self, password):

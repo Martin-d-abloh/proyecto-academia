@@ -8,7 +8,8 @@ from flask import (
     flash,
     send_from_directory,
     send_file,  
-    session
+    session, 
+    jsonify
 )
 
 from werkzeug.utils import secure_filename
@@ -34,10 +35,12 @@ from helpers import obtener_admin_actual
 import hashlib
 from datetime import datetime
 
+from flask_cors import CORS
+
 
 # Cargar variables de entorno
 load_dotenv()
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
 
 def normalizar(texto):
@@ -51,6 +54,7 @@ def generar_hash_credencial(nombre: str, apellidos: str) -> str:
 
 def create_app():
     app = Flask(__name__)
+    CORS(app, resources={r"/*": {"origins": "*"}})
     init_db(app)
     app.secret_key = "supersecreto"
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -84,24 +88,42 @@ def create_app():
     @app.route("/", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
-            usuario = request.form.get("usuario", "").lower().strip()
-            contrasena = request.form.get("contrasena", "").strip()
+            if request.is_json:
+                # Petición desde React
+                data = request.get_json()
+                usuario = data.get("usuario", "").lower().strip()
+                contrasena = data.get("contrasena", "").strip()
+            else:
+                # Petición desde formulario HTML
+                usuario = request.form.get("usuario", "").lower().strip()
+                contrasena = request.form.get("contrasena", "").strip()
 
-            # Usamos SQLAlchemy para buscar al admin en la base de datos
             admin = Administrador.query.filter_by(usuario=usuario).first()
 
             if admin and admin.check_password(contrasena):
-                session['usuario_admin'] = usuario
-                flash(f"Bienvenido, {admin.nombre}", "success")
+                session["usuario_admin"] = usuario
 
-                if admin.es_superadmin:
-                    return redirect(url_for("superadmin_home"))
+                if request.is_json:
+                    return jsonify({
+                        "mensaje": "Login exitoso",
+                        "usuario": usuario,
+                        "es_superadmin": admin.es_superadmin
+                    }), 200
                 else:
-                    return redirect(url_for("admin_home"))
+                    flash(f"Bienvenido, {admin.nombre}", "success")
+                    if admin.es_superadmin:
+                        return redirect(url_for("superadmin_home"))
+                    else:
+                        return redirect(url_for("admin_home"))
+
             else:
-                flash("Credenciales incorrectas", "error")
-        
+                if request.is_json:
+                    return jsonify({"error": "Credenciales incorrectas"}), 401
+                else:
+                    flash("Credenciales incorrectas", "error")
+
         return render_template("login.html", admin_actual=obtener_admin_actual())
+
 
 
 
@@ -276,10 +298,7 @@ def create_app():
                             admin_actual=admin_actual)
 
 
-        return render_template("tablas/ver_tabla.html", 
-                            tabla=tabla,
-                            documentos_requeridos=documentos_requeridos,
-                            alumnos=alumnos_con_docs)  # <-- Nueva estructura
+        
 
     @app.route("/eliminar_tabla/<int:id_tabla>", methods=["POST"])
     def eliminar_tabla(id_tabla):
