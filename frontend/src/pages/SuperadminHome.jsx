@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 function SuperadminHome() {
   const [admins, setAdmins] = useState([])
   const [nuevoAdmin, setNuevoAdmin] = useState({ nombre: "", contraseña: "" })
   const [mensaje, setMensaje] = useState("")
   const token = localStorage.getItem("token")
+  const superadminNombre = "Super Admin" // 👑 Nombre exacto del superadmin
+  const navigate = useNavigate()
 
   useEffect(() => {
     cargarAdmins()
@@ -102,12 +105,23 @@ function SuperadminHome() {
             className="bg-white p-3 rounded shadow flex justify-between items-center"
           >
             <span>{admin.nombre}</span>
-            <button
-              onClick={() => eliminarAdmin(admin.id)}
-              className="text-red-600 underline"
-            >
-              Eliminar
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => navigate(`/admin/tabla/${admin.id}`)}
+                className="text-blue-600 underline"
+              >
+                Ver
+              </button>
+
+              {admin.nombre !== superadminNombre && (
+                <button
+                  onClick={() => eliminarAdmin(admin.id)}
+                  className="text-red-600 underline"
+                >
+                  Eliminar
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>

@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, g 
 import jwt
 from models import Administrador, Alumno
 import os
@@ -69,6 +69,35 @@ def alumno_token_required(f):
 
         return f(*args, **kwargs)
     return decorated
+#TOKEN MIXTO
+def token_admin_o_superadmin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        if not token:
+            return jsonify({'error': 'Token requerido'}), 403
+
+        try:
+            data = jwt.decode(token, os.getenv("JWT_SECRET_KEY"), algorithms=["HS256"])
+            rol = data.get("rol")
+            if rol == "admin":
+                current_admin = Administrador.query.filter_by(usuario=data['usuario']).first()
+                if not current_admin:
+                    raise Exception("Admin no encontrado")
+                g.usuario_id = current_admin.id
+                g.rol = "admin"
+            elif rol == "superadmin":
+                g.usuario_id = data["id"]
+                g.rol = "superadmin"
+            else:
+                return jsonify({'error': 'Rol no autorizado'}), 403
+
+        except Exception as e:
+            return jsonify({'error': f'Token inválido: {str(e)}'}), 403
+
+        return f(*args, **kwargs)
+    return decorated
+
 
 
 # Función auxiliar

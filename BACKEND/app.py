@@ -10,7 +10,8 @@ from flask import (
     send_file,  
     session, 
     jsonify, 
-    make_response
+    make_response,
+    g
 )
 
 from werkzeug.utils import secure_filename
@@ -31,16 +32,15 @@ from models import (
     Tabla,
     Documento,
 )
-# 5. helpers
 from helpers import obtener_admin_actual
 import hashlib
 from datetime import datetime
-
+from werkzeug.security import generate_password_hash
 from flask_cors import CORS
 import jwt
 from datetime import datetime, timedelta
-from decoradores import token_required, superadmin_token_required, alumno_token_required
-from sqlalchemy.exc import SQLAlchemyError
+from decoradores import token_required, superadmin_token_required, alumno_token_required, token_admin_o_superadmin
+
 
 
 
@@ -1038,13 +1038,13 @@ def create_app():
 
     
     @app.route("/api/admin/tabla/<int:id>", methods=["GET"])
-    @token_required
-    def api_ver_tabla(current_admin, id):
+    @token_admin_o_superadmin
+    def api_ver_tabla(id):
         tabla = Tabla.query.get_or_404(id)
 
-        # 🔁 AHORA acepta tanto admin dueño como superadmin
-        if tabla.admin_id != current_admin.id and not current_admin.es_superadmin:
+        if tabla.admin_id != g.usuario_id and g.rol != "superadmin":
             return jsonify({"error": "Acceso denegado"}), 403
+
 
         alumnos = [
             {
@@ -1168,7 +1168,7 @@ def create_app():
             return jsonify({"error": "Ya existe un admin con ese nombre"}), 400
 
         nuevo = Administrador(nombre=nombre)
-        nuevo.password = contraseña
+        nuevo.password = generate_password_hash(contraseña)
         db.session.add(nuevo)
         db.session.commit()
 
