@@ -46,19 +46,30 @@ def alumno_token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = extraer_token()
+        print("🧪 TOKEN EXTRAÍDO:", token)
+
         if not token:
+            print("❌ No se encontró token en headers.")
             return jsonify({'error': 'Token requerido'}), 403
 
         try:
             data = jwt.decode(token, os.getenv("JWT_SECRET_KEY"), algorithms=["HS256"])
-            alumno = Alumno.query.get_or_404(kwargs.get("alumno_id"))
-            if str(alumno.id) != str(data.get("alumno_id")):
+            print("📦 DATA DEL TOKEN:", data)
+
+            alumno_id_token = str(data.get("alumno_id"))
+            alumno_id_url = str(kwargs.get("alumno_id"))
+            print(f"🔐 Comparando token-alumno: token={alumno_id_token} vs url={alumno_id_url}")
+
+            if alumno_id_token != alumno_id_url:
                 raise Exception("Token no válido para este alumno")
+
         except Exception as e:
+            print("💥 EXCEPCIÓN EN DECORADOR:", str(e))
             return jsonify({'error': f'Token inválido: {str(e)}'}), 403
 
         return f(*args, **kwargs)
     return decorated
+
 
 # Función auxiliar
 def extraer_token():

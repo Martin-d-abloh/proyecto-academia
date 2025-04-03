@@ -11,7 +11,7 @@ function AlumnoPanel() {
   useEffect(() => {
     const cargarDocumentos = async () => {
       const token = localStorage.getItem("token_alumno")
-      
+
       if (!token) {
         navigate("/login_alumno")
         return
@@ -21,8 +21,20 @@ function AlumnoPanel() {
         const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
           headers: { Authorization: `Bearer ${token}` }
         })
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            localStorage.removeItem("token_alumno")
+            navigate("/login_alumno")
+            return
+          }
+          const data = await response.json()
+          throw new Error(data.error || "Error de autenticación")
+        }
+
         const data = await response.json()
         setDocumentos(data.documentos)
+
       } catch (err) {
         console.error("Error cargando documentos:", err)
         setMensaje("⚠️ No se pudo cargar la información de los documentos.")
@@ -61,8 +73,7 @@ function AlumnoPanel() {
       const res = await fetch(`http://localhost:5001/api/alumno/${id}/subir`, {
         method: "POST",
         body: formData,
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include"
+        headers: { Authorization: `Bearer ${token}` }
       })
 
       if (!res.ok) {
@@ -72,7 +83,7 @@ function AlumnoPanel() {
 
       setMensaje("✅ Documento subido correctamente.")
       await actualizarDocumentos()
-      
+
     } catch (err) {
       console.error("Error en subida:", err)
       setMensaje(`❌ Error: ${err.message}`)
@@ -84,8 +95,7 @@ function AlumnoPanel() {
       const token = localStorage.getItem("token_alumno")
       const res = await fetch(`http://localhost:5001/api/alumno/${id}/documentos/${docId}/eliminar`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include"
+        headers: { Authorization: `Bearer ${token}` }
       })
 
       if (!res.ok) {
@@ -95,7 +105,7 @@ function AlumnoPanel() {
 
       await actualizarDocumentos()
       setMensaje("🗑️ Documento eliminado.")
-      
+
     } catch (err) {
       console.error("Error eliminando:", err)
       setMensaje(`❌ Error: ${err.message}`)
@@ -111,7 +121,7 @@ function AlumnoPanel() {
       {mensaje && <p className="mb-4 text-center text-red-600">{mensaje}</p>}
 
       {documentos.map((doc) => (
-        <div key={doc.id} className="bg-white p-4 rounded-lg shadow mb-4">
+        <div key={doc.id || doc.nombre} className="bg-white p-4 rounded-lg shadow mb-4">
           <h2 className="text-xl font-semibold">{doc.nombre}</h2>
           <p className="mb-2">
             Estado:{" "}
@@ -158,13 +168,9 @@ function AlumnoPanel() {
 
       <div className="mt-6 text-center">
         <button
-          onClick={async () => {
-            await fetch("http://localhost:5001/logout", { 
-              method: "POST", 
-              credentials: "include" 
-            })
+          onClick={() => {
             localStorage.removeItem("token_alumno")
-            window.location.href = "/"
+            navigate("/login_alumno")
           }}
           className="text-red-600 hover:text-red-800 underline"
         >

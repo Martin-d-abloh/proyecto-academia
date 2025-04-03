@@ -1,4 +1,4 @@
-# 1. Flask y extensiones 
+
 from flask import (
     Flask,
     render_template,
@@ -38,9 +38,9 @@ from datetime import datetime
 
 from flask_cors import CORS
 import jwt
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decoradores import token_required, superadmin_token_required, alumno_token_required
-
+from sqlalchemy.exc import SQLAlchemyError
 
 
 
@@ -892,9 +892,11 @@ def create_app():
 #  FRONTEND
 #----------------------------------------------------
   
-    @app.route("/api/alumno/<int:alumno_id>/subir", methods=["POST"])
+    @app.route("/api/alumno/<uuid:alumno_id>/subir", methods=["POST"])
     @alumno_token_required
     def api_subir_documentos(alumno_id):
+        
+
         try:
             archivo = request.files.get('archivo')
             doc_nombre = request.form.get('nombre_documento')
@@ -902,7 +904,7 @@ def create_app():
             if not archivo or not archivo.filename or not doc_nombre:
                 return jsonify({"error": "Faltan datos"}), 400
 
-            alumno = Alumno.query.get_or_404(alumno_id)
+            alumno = Alumno.query.get_or_404(str(alumno_id))
             tabla = alumno.tabla
 
             # Verificar que el documento sea requerido
@@ -956,10 +958,10 @@ def create_app():
             return jsonify({"error": "Error interno al subir"}), 500
 
 
-    @app.route("/api/alumno/<int:alumno_id>/documentos", methods=["GET"])
+    @app.route("/api/alumno/<uuid:alumno_id>/documentos", methods=["GET"])
     @alumno_token_required
     def api_documentos_alumno(alumno_id):
-        alumno = Alumno.query.get_or_404(alumno_id)
+        alumno = Alumno.query.get_or_404(str(alumno_id))  # ← ✅ UUID convertido a str
         tabla = alumno.tabla
 
         documentos_requeridos = Documento.query.filter_by(
@@ -994,12 +996,12 @@ def create_app():
         return jsonify({"documentos": documentos}), 200
 
 
-    @app.route("/api/alumno/<int:alumno_id>/documentos/<int:doc_id>/eliminar", methods=["DELETE"])
+    @app.route("/api/alumno/<uuid:alumno_id>/documentos/<int:doc_id>/eliminar", methods=["DELETE"])
     @alumno_token_required
     def api_eliminar_documento(alumno_id, doc_id):
         doc = Documento.query.get_or_404(doc_id)
 
-        if doc.alumno_id != alumno_id:
+        if str(doc.alumno_id) != str(alumno_id):
             return jsonify({"error": "Este documento no te pertenece"}), 403
 
         try:
@@ -1219,22 +1221,26 @@ def create_app():
         if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
             return jsonify({"error": "Acceso denegado"}), 403
 
-        # Credencial y contraseña normalizada
-        credencial = generar_hash_credencial(nombre, apellidos)
-        contraseña_normalizada = normalizar(f"{nombre} {apellidos}")
+        # Aquí estás generando la credencial:
+        credencial = generar_hash_credencial(normalizar(nombre), normalizar(apellidos))
 
+        # ⛔️ AQUÍ ESTABA EL ERROR: hacías set_password con el texto normalizado
+        # ✅ CAMBIA esa línea por esto:
+        password_claro = f"{nombre} {apellidos}".strip()
+        
         nuevo = Alumno(
             nombre=nombre,
             apellidos=apellidos,
             tabla_id=id_tabla,
             credencial=credencial
         )
-        nuevo.set_password(contraseña_normalizada)
+        nuevo.set_password(password_claro)  # ← esta línea es clave
 
         db.session.add(nuevo)
         db.session.commit()
 
         return jsonify({"mensaje": "Alumno creado", "id": nuevo.id}), 201
+
 
 
 
@@ -1266,7 +1272,7 @@ def create_app():
         db.session.commit()
         return jsonify({"mensaje": "Alumno eliminado"}), 200
 
-    
+
 
     @app.route("/api/login_jwt", methods=["POST"])
     def api_login_jwt():
@@ -1290,6 +1296,8 @@ def create_app():
     @app.route("/api/login_alumno", methods=["POST"])
     def api_login_alumno():
         data = request.get_json()
+        print("📦 DATA RECIBIDA:", data)
+
         credencial_raw = data.get("credencial", "").strip()
 
         if not credencial_raw:
@@ -1299,21 +1307,36 @@ def create_app():
         if len(partes) < 2:
             return jsonify({"error": "Introduce nombre y apellidos"}), 400
 
-        nombre = partes[0]
-        apellidos = " ".join(partes[1:])
+        # 🔥 Normalizamos antes de hashear
+        nombre = normalizar(partes[0])
+        apellidos = normalizar(" ".join(partes[1:]))
         credencial_hash = generar_hash_credencial(nombre, apellidos)
+
+        print("---- DEBUG LOGIN ALUMNO API ----")
+        print(f"Credencial raw: {credencial_raw}")
+        print(f"Nombre normalizado: {nombre}")
+        print(f"Apellidos normalizados: {apellidos}")
+        print(f"Hash generado: {credencial_hash}")
 
         alumno = Alumno.query.filter_by(credencial=credencial_hash).first()
         if alumno and alumno.check_password(credencial_raw):
             token = jwt.encode({
                 "alumno_id": alumno.id,
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)
+                "exp": datetime.utcnow() + timedelta(hours=12)
             }, os.getenv("JWT_SECRET_KEY"), algorithm="HS256")
 
             return jsonify({"token": token, "alumno_id": alumno.id})
 
+
         return jsonify({"error": "Credenciales incorrectas"}), 401
 
+
+    @app.route("/debug/alumnos")
+    def debug_alumnos():
+        alumnos = Alumno.query.all()
+        for a in alumnos:
+            print(f"{a.id}: {a.nombre} {a.apellidos} — credencial: {a.credencial}")
+        return "OK"
 
 
 
