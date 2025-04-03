@@ -37,12 +37,18 @@ import hashlib
 from datetime import datetime
 
 from flask_cors import CORS
+import jwt
+from datetime import timedelta
+from decoradores import token_required, superadmin_token_required, alumno_token_required
+
+
 
 
 # Cargar variables de entorno
 load_dotenv()
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
 def normalizar(texto):
     texto = texto.lower().replace(" ", "")
@@ -657,7 +663,7 @@ def create_app():
                        admin_actual=admin, 
                        es_vista_externa=True)
 
-
+    
     @app.route("/descargar/<int:doc_id>")
     def descargar_documento(doc_id):
 
@@ -887,10 +893,8 @@ def create_app():
 #----------------------------------------------------
   
     @app.route("/api/alumno/<int:alumno_id>/subir", methods=["POST"])
+    @alumno_token_required
     def api_subir_documentos(alumno_id):
-        if not session.get('usuario_alumno') or str(session['usuario_alumno']) != str(alumno_id):
-            return jsonify({"error": "No autorizado"}), 403
-
         try:
             archivo = request.files.get('archivo')
             doc_nombre = request.form.get('nombre_documento')
@@ -951,11 +955,10 @@ def create_app():
             app.logger.error(f"Error en subida API: {str(e)}")
             return jsonify({"error": "Error interno al subir"}), 500
 
-    @app.route("/api/alumno/<int:alumno_id>/documentos", methods=["GET"])
-    def api_documentos_alumno(alumno_id):
-        if not session.get('usuario_alumno') or str(session['usuario_alumno']) != str(alumno_id):
-            return jsonify({"error": "No autorizado"}), 403
 
+    @app.route("/api/alumno/<int:alumno_id>/documentos", methods=["GET"])
+    @alumno_token_required
+    def api_documentos_alumno(alumno_id):
         alumno = Alumno.query.get_or_404(alumno_id)
         tabla = alumno.tabla
 
@@ -990,11 +993,10 @@ def create_app():
 
         return jsonify({"documentos": documentos}), 200
 
-    @app.route("/api/alumno/<int:alumno_id>/documentos/<int:doc_id>/eliminar", methods=["DELETE"])
-    def api_eliminar_documento(alumno_id, doc_id):
-        if not session.get('usuario_alumno') or str(session['usuario_alumno']) != str(alumno_id):
-            return jsonify({"error": "No autorizado"}), 403
 
+    @app.route("/api/alumno/<int:alumno_id>/documentos/<int:doc_id>/eliminar", methods=["DELETE"])
+    @alumno_token_required
+    def api_eliminar_documento(alumno_id, doc_id):
         doc = Documento.query.get_or_404(doc_id)
 
         if doc.alumno_id != alumno_id:
@@ -1003,24 +1005,22 @@ def create_app():
         try:
             if doc.ruta and os.path.exists(doc.ruta):
                 os.remove(doc.ruta)
+
             db.session.delete(doc)
             db.session.commit()
             return jsonify({"mensaje": "Documento eliminado"}), 200
+
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error al eliminar documento: {str(e)}")
             return jsonify({"error": "Error al eliminar el documento"}), 500
 
+    
+    
     @app.route("/api/admin/tablas", methods=["GET"])
-    def api_listar_tablas():
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
-        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
-        if not admin:
-            return jsonify({"error": "Admin no encontrado"}), 404
-
-        tablas = Tabla.query.filter_by(admin_id=admin.id).all()
+    @token_required
+    def api_listar_tablas(current_admin):  # 👈 Recibe el admin verificado
+        tablas = Tabla.query.filter_by(admin_id=current_admin.id).all()
 
         resultado = []
         for tabla in tablas:
@@ -1034,14 +1034,14 @@ def create_app():
 
 
 
+    
     @app.route("/api/admin/tabla/<int:id>", methods=["GET"])
-    def api_ver_tabla(id):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
+    @token_required
+    def api_ver_tabla(current_admin, id):
         tabla = Tabla.query.get_or_404(id)
 
-        if tabla.admin.usuario != session['usuario_admin']:
+        # 🔁 AHORA acepta tanto admin dueño como superadmin
+        if tabla.admin_id != current_admin.id and not current_admin.es_superadmin:
             return jsonify({"error": "Acceso denegado"}), 403
 
         alumnos = [
@@ -1081,12 +1081,11 @@ def create_app():
             "documentos": documentos,
             "subidos": subidos  
         }), 200
-
+    
+    
     @app.route("/api/admin/tabla/<int:id>/documento", methods=["POST"])
-    def api_añadir_documento(id):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
+    @token_required
+    def api_añadir_documento(current_admin, id):
         data = request.get_json()
         nombre_doc = data.get("nombre")
 
@@ -1095,7 +1094,7 @@ def create_app():
 
         tabla = Tabla.query.get_or_404(id)
 
-        if tabla.admin.usuario != session['usuario_admin']:
+        if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
             return jsonify({"error": "Acceso denegado"}), 403
 
         nuevo = Documento(
@@ -1110,15 +1109,14 @@ def create_app():
 
         return jsonify({"mensaje": "Documento creado"}), 201
 
-    @app.route("/api/admin/tabla/<int:tabla_id>/documento/<int:doc_id>", methods=["DELETE"])
-    def api_eliminar_documento_tabla(tabla_id, doc_id):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
 
+    @app.route("/api/admin/tabla/<int:tabla_id>/documento/<int:doc_id>", methods=["DELETE"])
+    @token_required
+    def api_eliminar_documento_tabla(current_admin, tabla_id, doc_id):
         tabla = Tabla.query.get_or_404(tabla_id)
         documento = Documento.query.get_or_404(doc_id)
 
-        if tabla.admin.usuario != session['usuario_admin']:
+        if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
             return jsonify({"error": "Acceso denegado"}), 403
 
         try:
@@ -1134,30 +1132,29 @@ def create_app():
             app.logger.error(f"Error al eliminar documento: {str(e)}")
             return jsonify({"error": "Error al eliminar documento"}), 500
 
-    @app.route("/api/superadmin/admins", methods=["GET"])
-    def api_listar_admins():
-        if not session.get('usuario_superadmin'):
-            return jsonify({"error": "No autorizado"}), 403
 
+        
+
+    @app.route("/api/superadmin/admins", methods=["GET"])
+    @superadmin_token_required
+    def api_listar_admins():
         admins = Administrador.query.all()
         datos = [{"id": a.id, "nombre": a.nombre} for a in admins]
         return jsonify({"admins": datos}), 200
 
-    @app.route("/api/superadmin/admins/<int:id>", methods=["DELETE"])
-    def api_eliminar_admin(id):
-        if not session.get('usuario_superadmin'):
-            return jsonify({"error": "No autorizado"}), 403
 
+    @app.route("/api/superadmin/admins/<int:id>", methods=["DELETE"])
+    @superadmin_token_required
+    def api_eliminar_admin(id):
         admin = Administrador.query.get_or_404(id)
         db.session.delete(admin)
         db.session.commit()
         return jsonify({"mensaje": "Admin eliminado"}), 200
 
-    @app.route("/api/superadmin/admins", methods=["POST"])
-    def api_crear_admin():
-        if not session.get('usuario_superadmin'):
-            return jsonify({"error": "No autorizado"}), 403
 
+    @app.route("/api/superadmin/admins", methods=["POST"])
+    @superadmin_token_required
+    def api_crear_admin():
         data = request.get_json()
         nombre = data.get("nombre")
         contraseña = data.get("contraseña")
@@ -1169,47 +1166,47 @@ def create_app():
             return jsonify({"error": "Ya existe un admin con ese nombre"}), 400
 
         nuevo = Administrador(nombre=nombre)
-        nuevo.set_password(contraseña)
+        nuevo.password = contraseña
         db.session.add(nuevo)
         db.session.commit()
+
         return jsonify({"mensaje": "Admin creado"}), 201
 
+    
     @app.route("/api/admin/tablas", methods=["POST"])
-    def api_crear_tabla():
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
+    @token_required
+    def api_crear_tabla(current_admin):
         data = request.get_json()
         nombre = data.get("nombre")
 
         if not nombre:
             return jsonify({"error": "Nombre requerido"}), 400
 
-        admin = Administrador.query.filter_by(usuario=session['usuario_admin']).first()
-        nueva = Tabla(nombre=nombre, admin_id=admin.id)
+        nueva = Tabla(nombre=nombre, admin_id=current_admin.id)
         db.session.add(nueva)
         db.session.commit()
+
         return jsonify({"mensaje": "Tabla creada"}), 201
 
-    @app.route("/api/admin/tabla/<int:id>", methods=["DELETE"])
-    def api_eliminar_tabla(id):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
+    
 
+    @app.route("/api/admin/tabla/<int:id>", methods=["DELETE"])
+    @token_required
+    def api_eliminar_tabla(current_admin, id):
         tabla = Tabla.query.get_or_404(id)
 
-        if tabla.admin.usuario != session['usuario_admin']:
+        if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
             return jsonify({"error": "Acceso denegado"}), 403
 
         db.session.delete(tabla)
         db.session.commit()
         return jsonify({"mensaje": "Tabla eliminada"}), 200
 
+    
+    
     @app.route("/api/admin/tabla/<int:id_tabla>/alumnos", methods=["POST"])
-    def api_crear_alumno(id_tabla):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
+    @token_required
+    def api_crear_alumno(current_admin, id_tabla):
         data = request.get_json()
         nombre = data.get("nombre")
         apellidos = data.get("apellidos")
@@ -1217,12 +1214,32 @@ def create_app():
         if not nombre or not apellidos:
             return jsonify({"error": "Faltan datos del alumno"}), 400
 
-        nuevo = Alumno(nombre=nombre, apellidos=apellidos, tabla_id=id_tabla)
+        tabla = Tabla.query.get_or_404(id_tabla)
+
+        if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
+            return jsonify({"error": "Acceso denegado"}), 403
+
+        # Credencial y contraseña normalizada
+        credencial = generar_hash_credencial(nombre, apellidos)
+        contraseña_normalizada = normalizar(f"{nombre} {apellidos}")
+
+        nuevo = Alumno(
+            nombre=nombre,
+            apellidos=apellidos,
+            tabla_id=id_tabla,
+            credencial=credencial
+        )
+        nuevo.set_password(contraseña_normalizada)
+
         db.session.add(nuevo)
         db.session.commit()
+
         return jsonify({"mensaje": "Alumno creado", "id": nuevo.id}), 201
 
+
+
     @app.route("/api/alumno/<int:id>", methods=["GET"])
+    @alumno_token_required
     def api_ver_alumno(id):
         alumno = Alumno.query.get_or_404(id)
         return jsonify({
@@ -1232,18 +1249,76 @@ def create_app():
             "tabla_id": alumno.tabla_id
         }), 200
 
+    
     @app.route("/api/admin/tabla/<int:id_tabla>/alumno/<int:id>", methods=["DELETE"])
-    def api_eliminar_alumno(id_tabla, id):
-        if not session.get('usuario_admin'):
-            return jsonify({"error": "No autorizado"}), 403
-
+    @token_required
+    def api_eliminar_alumno(current_admin, id_tabla, id):
         alumno = Alumno.query.get_or_404(id)
+
         if alumno.tabla_id != id_tabla:
             return jsonify({"error": "Alumno no pertenece a esta tabla"}), 400
+
+        tabla = Tabla.query.get_or_404(id_tabla)
+        if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
+            return jsonify({"error": "Acceso denegado"}), 403
 
         db.session.delete(alumno)
         db.session.commit()
         return jsonify({"mensaje": "Alumno eliminado"}), 200
+
+    
+
+    @app.route("/api/login_jwt", methods=["POST"])
+    def api_login_jwt():
+        data = request.get_json()
+        usuario = data.get("usuario", "").strip().lower()
+        contrasena = data.get("contrasena", "").strip()
+
+        admin = Administrador.query.filter_by(usuario=usuario).first()
+
+        if admin and admin.check_password(contrasena):
+            payload = {
+                "usuario": usuario,
+                "es_superadmin": admin.es_superadmin,
+                "exp": datetime.utcnow() + timedelta(hours=2)
+            }
+            token = jwt.encode(payload, os.getenv("JWT_SECRET_KEY"), algorithm="HS256")
+            return jsonify({"token": token}), 200
+
+        return jsonify({"error": "Credenciales incorrectas"}), 401
+    
+    @app.route("/api/login_alumno", methods=["POST"])
+    def api_login_alumno():
+        data = request.get_json()
+        credencial_raw = data.get("credencial", "").strip()
+
+        if not credencial_raw:
+            return jsonify({"error": "Credencial requerida"}), 400
+
+        partes = credencial_raw.split()
+        if len(partes) < 2:
+            return jsonify({"error": "Introduce nombre y apellidos"}), 400
+
+        nombre = partes[0]
+        apellidos = " ".join(partes[1:])
+        credencial_hash = generar_hash_credencial(nombre, apellidos)
+
+        alumno = Alumno.query.filter_by(credencial=credencial_hash).first()
+        if alumno and alumno.check_password(credencial_raw):
+            token = jwt.encode({
+                "alumno_id": alumno.id,
+                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)
+            }, os.getenv("JWT_SECRET_KEY"), algorithm="HS256")
+
+            return jsonify({"token": token, "alumno_id": alumno.id})
+
+        return jsonify({"error": "Credenciales incorrectas"}), 401
+
+
+
+
+
+
     
 
     return app

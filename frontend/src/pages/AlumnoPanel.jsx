@@ -1,74 +1,119 @@
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
 
 function AlumnoPanel() {
-  // Obtener el ID del alumno de los parámetros de la URL
   const { id } = useParams()
-  
-  // Estados para manejar los documentos, archivos y mensajes
   const [documentos, setDocumentos] = useState([])
   const [archivos, setArchivos] = useState({})
   const [mensaje, setMensaje] = useState("")
+  const navigate = useNavigate()
 
-  // Efecto para cargar los documentos del alumno al montar el componente
   useEffect(() => {
-    fetch(`/api/alumno/${id}/documentos`)
-      .then(res => res.json())
-      .then(data => setDocumentos(data.documentos))
-      .catch(err => console.error("Error cargando documentos:", err))
-  }, [id])
+    const cargarDocumentos = async () => {
+      const token = localStorage.getItem("token_alumno")
+      
+      if (!token) {
+        navigate("/login_alumno")
+        return
+      }
 
-  // Manejar cambios en los inputs de archivos
+      try {
+        const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const data = await response.json()
+        setDocumentos(data.documentos)
+      } catch (err) {
+        console.error("Error cargando documentos:", err)
+        setMensaje("⚠️ No se pudo cargar la información de los documentos.")
+      }
+    }
+
+    cargarDocumentos()
+  }, [id, navigate])
+
   const handleFileChange = (nombre, archivo) => {
     setArchivos(prev => ({ ...prev, [nombre]: archivo }))
   }
 
-  // Función para subir un archivo al servidor
-  const handleUpload = async (nombre) => {
-    const archivo = archivos[nombre]
-    if (!archivo) {
-      setMensaje("⚠️ Selecciona un archivo antes de subir.")
-      return
-    }
-
-    // Preparar los datos del formulario
-    const formData = new FormData()
-    formData.append("archivo", archivo)
-    formData.append("nombre_documento", nombre)
-
-    // Enviar la solicitud al servidor
-    const res = await fetch(`/api/alumno/${id}/subir`, {
-      method: "POST",
-      body: formData
+  const actualizarDocumentos = async () => {
+    const token = localStorage.getItem("token_alumno")
+    const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
+      headers: { Authorization: `Bearer ${token}` }
     })
+    const data = await response.json()
+    setDocumentos(data.documentos)
+  }
 
-    const data = await res.json()
+  const handleUpload = async (nombre) => {
+    try {
+      const archivo = archivos[nombre]
+      if (!archivo) {
+        setMensaje("⚠️ Selecciona un archivo antes de subir.")
+        return
+      }
 
-    if (res.ok) {
+      const formData = new FormData()
+      formData.append("archivo", archivo)
+      formData.append("nombre_documento", nombre)
+
+      const token = localStorage.getItem("token_alumno")
+      const res = await fetch(`http://localhost:5001/api/alumno/${id}/subir`, {
+        method: "POST",
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include"
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error al subir el documento")
+      }
+
       setMensaje("✅ Documento subido correctamente.")
-      // Recargar la lista de documentos después de subir
-      const nuevos = await fetch(`/api/alumno/${id}/documentos`).then(r => r.json())
-      setDocumentos(nuevos.documentos)
-    } else {
-      setMensaje(`❌ Error: ${data.error || "algo salió mal."}`)
+      await actualizarDocumentos()
+      
+    } catch (err) {
+      console.error("Error en subida:", err)
+      setMensaje(`❌ Error: ${err.message}`)
+    }
+  }
+
+  const eliminarDocumento = async (docId) => {
+    try {
+      const token = localStorage.getItem("token_alumno")
+      const res = await fetch(`http://localhost:5001/api/alumno/${id}/documentos/${docId}/eliminar`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include"
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Error al eliminar")
+      }
+
+      await actualizarDocumentos()
+      setMensaje("🗑️ Documento eliminado.")
+      
+    } catch (err) {
+      console.error("Error eliminando:", err)
+      setMensaje(`❌ Error: ${err.message}`)
     }
   }
 
   return (
     <div className="min-h-screen bg-green-50 p-6">
-      {/* Título del panel */}
       <h1 className="text-3xl font-bold text-green-700 mb-6">
         Panel del Alumno #{id}
       </h1>
 
-      {/* Mostrar mensajes de estado */}
-      {mensaje && <p className="mb-4">{mensaje}</p>}
+      {mensaje && <p className="mb-4 text-center text-red-600">{mensaje}</p>}
 
-      {/* Lista de documentos */}
       {documentos.map((doc) => (
-        <div key={doc.nombre} className="bg-white p-4 rounded-lg shadow mb-4">
+        <div key={doc.id} className="bg-white p-4 rounded-lg shadow mb-4">
           <h2 className="text-xl font-semibold">{doc.nombre}</h2>
-          <p>
+          <p className="mb-2">
             Estado:{" "}
             {doc.estado === "subido" && "📄 Subido"}
             {doc.estado === "aceptado" && "✅ Aceptado"}
@@ -76,55 +121,56 @@ function AlumnoPanel() {
             {doc.estado === "no_subido" && "⚠️ No subido"}
           </p>
 
-          {/* Sección de acciones para documentos subidos */}
           {doc.subido && (
             <div className="flex items-center space-x-4 mt-2">
               <a
-                href={`/descargar_documento/${doc.id}`}
-                className="text-blue-600 underline"
+                href={`/descargar/${doc.id}`}
+                className="text-blue-600 hover:text-blue-800 underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 📥 Descargar
               </a>
-
               <button
-                onClick={async () => {
-                  const res = await fetch(`/api/alumno/${id}/documentos/${doc.id}/eliminar`, {
-                    method: "DELETE"
-                  })
-                  const data = await res.json()
-                  if (res.ok) {
-                    const nuevos = await fetch(`/api/alumno/${id}/documentos`).then(r => r.json())
-                    setDocumentos(nuevos.documentos)
-                    setMensaje("🗑️ Documento eliminado.")
-                  } else {
-                    setMensaje(`❌ Error: ${data.error || "no se pudo eliminar."}`)
-                  }
-                }}
-                className="text-red-600 underline"
+                onClick={() => eliminarDocumento(doc.id)}
+                className="text-red-600 hover:text-red-800 underline"
               >
                 Eliminar documento
               </button>
             </div>
           )}
 
-          {/* Input para seleccionar archivo */}
-          <input
-            type="file"
-            onChange={(e) => handleFileChange(doc.nombre, e.target.files[0])}
-            className="mt-2"
-          />
-
-          {/* Botón para subir el documento */}
-          <button
-            onClick={() => handleUpload(doc.nombre)}
-            className="bg-green-600 text-white px-4 py-1 rounded mt-2 hover:bg-green-700"
-          >
-            Subir documento
-          </button>
+          <div className="mt-3">
+            <input
+              type="file"
+              onChange={(e) => handleFileChange(doc.nombre, e.target.files[0])}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+            />
+            <button
+              onClick={() => handleUpload(doc.nombre)}
+              className="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+            >
+              Subir documento
+            </button>
+          </div>
         </div>
       ))}
+
+      <div className="mt-6 text-center">
+        <button
+          onClick={async () => {
+            await fetch("http://localhost:5001/logout", { 
+              method: "POST", 
+              credentials: "include" 
+            })
+            localStorage.removeItem("token_alumno")
+            window.location.href = "/"
+          }}
+          className="text-red-600 hover:text-red-800 underline"
+        >
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   )
 }

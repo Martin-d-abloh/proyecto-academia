@@ -4,18 +4,30 @@ function SuperadminHome() {
   const [admins, setAdmins] = useState([])
   const [nuevoAdmin, setNuevoAdmin] = useState({ nombre: "", contraseña: "" })
   const [mensaje, setMensaje] = useState("")
+  const token = localStorage.getItem("token")
 
   useEffect(() => {
-    fetch("/api/superadmin/admins")
+    cargarAdmins()
+  }, [])
+
+  const cargarAdmins = () => {
+    fetch("http://localhost:5001/api/superadmin/admins", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((res) => res.json())
       .then((data) => setAdmins(data.admins))
       .catch((err) => console.error("Error cargando admins:", err))
-  }, [])
+  }
 
   const crearAdmin = async () => {
-    const res = await fetch("/api/superadmin/admins", {
+    const res = await fetch("http://localhost:5001/api/superadmin/admins", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(nuevoAdmin),
     })
 
@@ -23,23 +35,24 @@ function SuperadminHome() {
     if (res.ok) {
       setMensaje("✅ Admin creado")
       setNuevoAdmin({ nombre: "", contraseña: "" })
-      const nuevos = await fetch("/api/superadmin/admins").then((r) => r.json())
-      setAdmins(nuevos.admins)
+      cargarAdmins()
     } else {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
 
   const eliminarAdmin = async (id) => {
-    const res = await fetch(`/api/superadmin/admins/${id}`, {
+    const res = await fetch(`http://localhost:5001/api/superadmin/admins/${id}`, {
       method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     })
 
     const data = await res.json()
     if (res.ok) {
       setMensaje("🗑️ Admin eliminado")
-      const nuevos = await fetch("/api/superadmin/admins").then((r) => r.json())
-      setAdmins(nuevos.admins)
+      cargarAdmins()
     } else {
       setMensaje(`❌ Error: ${data.error}`)
     }

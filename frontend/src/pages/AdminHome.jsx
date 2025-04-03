@@ -7,9 +7,13 @@ function AdminHome() {
   const [mensaje, setMensaje] = useState("")
   const navigate = useNavigate()
 
+  const token = localStorage.getItem("token")
+
   useEffect(() => {
     fetch("http://localhost:5001/api/admin/tablas", {
-      credentials: "include"
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
     })
       .then((res) => res.json())
       .then((data) => setTablas(data.tablas))
@@ -21,16 +25,22 @@ function AdminHome() {
 
     const res = await fetch("http://localhost:5001/api/admin/tablas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre: nuevaTabla }),
-      credentials: "include"
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ nombre: nuevaTabla })
     })
 
     const data = await res.json()
     if (res.ok) {
       setMensaje("✅ Tabla creada")
       setNuevaTabla("")
-      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", { credentials: "include" }).then((r) => r.json())
+      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      }).then((r) => r.json())
       setTablas(nuevas.tablas)
     } else {
       setMensaje(`❌ Error: ${data.error}`)
@@ -40,18 +50,25 @@ function AdminHome() {
   const eliminarTabla = async (id) => {
     const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
       method: "DELETE",
-      credentials: "include"
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
     })
 
     const data = await res.json()
     if (res.ok) {
       setMensaje("🗑️ Tabla eliminada")
-      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", { credentials: "include" }).then((r) => r.json())
+      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      }).then((r) => r.json())
       setTablas(nuevas.tablas)
     } else {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
