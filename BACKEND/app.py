@@ -12,7 +12,7 @@ def create_app():
     load_dotenv()
 
     app = Flask(__name__)
-    CORS(app, supports_credentials=True, resources={r"/*": {"origins": "http://localhost:5173"}})
+    CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'app.db')}"

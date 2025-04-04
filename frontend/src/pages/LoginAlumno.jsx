@@ -13,16 +13,17 @@ function LoginAlumno() {
       const res = await fetch("http://localhost:5001/api/login_alumno", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ credencial })
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setMensaje(data.error || "❌ Error en el login")
+        localStorage.removeItem("token_alumno")
+        setMensaje("❌ Credenciales incorrectas")
         return
       }
+      
 
       localStorage.setItem("token_alumno", data.token)
       navigate(`/alumno/${data.alumno_id}`)

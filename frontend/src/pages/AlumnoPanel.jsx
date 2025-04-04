@@ -9,14 +9,13 @@ function AlumnoPanel() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    const token = localStorage.getItem("token_alumno")
+    if (!token) {
+      navigate("/login_alumno")
+      return
+    }
+  
     const cargarDocumentos = async () => {
-      const token = localStorage.getItem("token_alumno")
-  
-      if (!token) {
-        navigate("/login_alumno")
-        return
-      }
-  
       try {
         const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -25,20 +24,18 @@ function AlumnoPanel() {
         if (!response.ok) {
           const text = await response.text()
           console.error("Respuesta completa del backend:", text)
-        
+  
           if (response.status === 403) {
             localStorage.removeItem("token_alumno")
             navigate("/login_alumno")
             return
           }
-        
+  
           throw new Error("Error del backend al cargar documentos")
         }
-        
   
         const data = await response.json()
         setDocumentos(data.documentos || [])
-  
       } catch (err) {
         console.error("Error cargando documentos:", err)
         setMensaje(`❌ ${err.message}`)
@@ -47,6 +44,7 @@ function AlumnoPanel() {
   
     cargarDocumentos()
   }, [id, navigate])
+  
   
 
   const handleFileChange = (nombre, archivo) => {
