@@ -16,41 +16,41 @@ function TablaView() {
   const [nuevoAlumno, setNuevoAlumno] = useState({ nombre: "", apellidos: "" })
   const [mensaje, setMensaje] = useState("")
 
-  useEffect(() => {
-    const cargarTabla = async () => {
-      try {
-        const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-  
-        if (!res.ok) {
-          if (res.status === 403) {
-            localStorage.removeItem("token")
-            navigate("/")
-          } else {
-            const data = await res.json()
-            setMensaje(`❌ Error: ${data.error || "No se pudo cargar la tabla"}`)
-          }
-          return
+  const cargarTabla = async () => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        if (res.status === 403) {
+          localStorage.removeItem("token")
+          navigate("/")
+        } else {
+          const data = await res.json()
+          setMensaje(`❌ Error: ${data.error || "No se pudo cargar la tabla"}`)
         }
-  
-        const data = await res.json()
-        setTabla({
-          nombre: data.nombre || "",
-          documentos: data.documentos || [],
-          alumnos: data.alumnos || [],
-          subidos: data.subidos || []
-        })
-  
-      } catch (error) {
-        console.error("Error cargando tabla:", error)
-        setMensaje("Error al cargar los datos")
+        return
       }
+
+      const data = await res.json()
+      setTabla({
+        nombre: data.nombre || "",
+        documentos: data.documentos || [],
+        alumnos: data.alumnos || [],
+        subidos: data.subidos || []
+      })
+
+    } catch (error) {
+      console.error("Error cargando tabla:", error)
+      setMensaje("Error al cargar los datos")
     }
-  
+  }
+
+  useEffect(() => {
     cargarTabla()
   }, [id, token])
-  
+
 
   const añadirDocumento = async () => {
     if (!nuevoDoc) return
@@ -64,14 +64,11 @@ function TablaView() {
         body: JSON.stringify({ nombre: nuevoDoc }),
       })
       const data = await res.json()
-      
+
       if (res.ok) {
         setMensaje("✅ Documento añadido")
         setNuevoDoc("")
-        setTabla(prev => ({
-          ...prev,
-          documentos: [...prev.documentos, data]
-        }))
+        await cargarTabla()
       } else {
         setMensaje(`❌ Error: ${data.error}`)
       }
@@ -83,73 +80,50 @@ function TablaView() {
   const eliminarDocumento = async (docId) => {
     if (!confirm("¿Eliminar este documento?")) return
     try {
-      const backupEstado = structuredClone(tabla)
-      
-      setTabla(prev => ({
-        ...prev,
-        documentos: prev.documentos.filter(d => d.id !== docId),
-        subidos: prev.subidos.filter(s => s.nombre !== docId)
-      }))
-  
       const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/documento/${docId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-  
+
       if (!res.ok) throw new Error("Error del servidor")
-      
       setMensaje("✅ Documento eliminado")
+      await cargarTabla()
     } catch (err) {
-      setTabla(backupEstado)
       setMensaje(`❌ Error: ${err.message}`)
     }
   }
 
+  const eliminarAlumno = async (alumnoId) => {
+    if (!confirm("¿Eliminar este alumno permanentemente?")) return
+    console.log("Intentando eliminar alumno con ID:", alumnoId)
+    console.log("ID de la tabla:", id)
+    console.log("Token que se está usando:", token)
 
-const eliminarAlumno = async (alumnoId) => {
-  if (!confirm("¿Eliminar este alumno permanentemente?")) return
-  
-  try {
-    const token = localStorage.getItem("token_admin") || localStorage.getItem("token")
-    const backupEstado = structuredClone(tabla) // 1. Backup del estado
+    try {
+      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/alumno/${alumnoId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      })
 
-    // 2. Eliminación optimista inmediata
-    setTabla(prev => ({
-      ...prev,
-      alumnos: prev.alumnos.filter(a => a.id !== alumnoId),
-      subidos: prev.subidos.filter(s => s.alumno_id !== alumnoId)
-    }))
-
-    // 3. Petición al backend
-    const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/alumno/${alumnoId}`, {
-      method: "DELETE",
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Error desconocido" }))
+        throw new Error(errorData.error || `Error HTTP: ${res.status}`)
       }
-    })
 
-    // 4. Manejo de respuesta
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ error: "Error desconocido" }))
-      throw new Error(errorData.error || `Error HTTP: ${res.status}`)
-    }
+      setMensaje("✅ Alumno eliminado exitosamente")
+      await cargarTabla()
 
-    setMensaje("✅ Alumno eliminado exitosamente")
-
-  } catch (err) {
-    // 5. Rollback automático con feedback
-    console.error("Error en eliminación:", err)
-    setTabla(backupEstado)
-    setMensaje(`❌ ${err.message || "Error al eliminar"}`)
-    
-    // 6. Recarga segura solo para errores críticos
-    if (err.message.includes("Token") || err.message.includes("permiso")) {
-      setTimeout(() => location.reload(), 2000)
+    } catch (err) {
+      console.error("Error en eliminación:", err)
+      setMensaje(`❌ ${err.message || "Error al eliminar"}`)
+      if (err.message.includes("Token") || err.message.includes("permiso")) {
+        setTimeout(() => location.reload(), 2000)
+      }
     }
   }
-}
-  
 
   const añadirAlumno = async () => {
     if (!nuevoAlumno.nombre || !nuevoAlumno.apellidos) {
@@ -167,14 +141,11 @@ const eliminarAlumno = async (alumnoId) => {
         body: JSON.stringify(nuevoAlumno)
       })
       const data = await res.json()
-      
+
       if (res.ok) {
         setMensaje("✅ Alumno añadido")
         setNuevoAlumno({ nombre: "", apellidos: "" })
-        setTabla(prev => ({
-          ...prev,
-          alumnos: [...prev.alumnos, data]
-        }))
+        await cargarTabla()
       } else {
         setMensaje(`❌ Error: ${data.error}`)
       }

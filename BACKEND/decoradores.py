@@ -8,6 +8,9 @@ import os
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return '', 200  # Permitir preflight CORS sin token
+
         token = request.headers.get("Authorization", "").replace("Bearer ", "")
         if not token:
             return jsonify({'error': 'Token requerido'}), 403
@@ -30,10 +33,12 @@ def token_required(f):
 
 
 # JWT para SUPERADMIN
-
 def superadmin_token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return '', 200
+
         token = request.headers.get("Authorization", "").replace("Bearer ", "")
         if not token:
             return jsonify({'error': 'Token requerido'}), 403
@@ -49,11 +54,13 @@ def superadmin_token_required(f):
     return decorated
 
 
-
 # JWT para ALUMNO
 def alumno_token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return '', 200
+
         token = request.headers.get("Authorization", "").replace("Bearer ", "")
         if not token:
             return jsonify({'error': 'Token requerido'}), 403
@@ -71,6 +78,7 @@ def alumno_token_required(f):
 
         return f(*args, **kwargs)
     return decorated
+
 
 # Función auxiliar
 def extraer_token():

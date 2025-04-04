@@ -346,6 +346,29 @@ def api_panel_admin_completo(admin_id):
     }), 200
 
 
+@admin_bp.route("/api/admin/tabla/<int:id_tabla>/alumno/<id_alumno>", methods=["DELETE", "OPTIONS"])
+@token_required
+def eliminar_alumno_de_tabla(current_admin, id_tabla, id_alumno):
+    try:
+        tabla = Tabla.query.get(id_tabla)
+        if not tabla:
+            return jsonify({"error": "Tabla no encontrada"}), 404
+
+        if tabla.admin_id != current_admin.id:
+            return jsonify({"error": "No tienes permiso para modificar esta tabla"}), 403
+
+        # Buscar y eliminar relación alumno-tabla
+        alumno = Alumno.query.get(id_alumno)
+        if not alumno or alumno not in tabla.alumnos:
+            return jsonify({"error": "Alumno no pertenece a esta tabla"}), 404
+
+        tabla.alumnos.remove(alumno)
+        db.session.commit()
+        return jsonify({"mensaje": "Alumno eliminado de la tabla"}), 200
+
+    except Exception as e:
+        print("Error eliminando alumno:", e)
+        return jsonify({"error": "Error eliminando alumno"}), 500
 
 
 

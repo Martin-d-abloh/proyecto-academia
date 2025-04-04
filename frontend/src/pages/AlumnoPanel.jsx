@@ -11,38 +11,43 @@ function AlumnoPanel() {
   useEffect(() => {
     const cargarDocumentos = async () => {
       const token = localStorage.getItem("token_alumno")
-
+  
       if (!token) {
         navigate("/login_alumno")
         return
       }
-
+  
       try {
         const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-
+  
         if (!response.ok) {
+          const text = await response.text()
+          console.error("Respuesta completa del backend:", text)
+        
           if (response.status === 403) {
             localStorage.removeItem("token_alumno")
             navigate("/login_alumno")
             return
           }
-          const data = await response.json()
-          throw new Error(data.error || "Error de autenticación")
+        
+          throw new Error("Error del backend al cargar documentos")
         }
-
+        
+  
         const data = await response.json()
-        setDocumentos(data.documentos)
-
+        setDocumentos(data.documentos || [])
+  
       } catch (err) {
         console.error("Error cargando documentos:", err)
-        setMensaje("⚠️ No se pudo cargar la información de los documentos.")
+        setMensaje(`❌ ${err.message}`)
       }
     }
-
+  
     cargarDocumentos()
   }, [id, navigate])
+  
 
   const handleFileChange = (nombre, archivo) => {
     setArchivos(prev => ({ ...prev, [nombre]: archivo }))
@@ -119,6 +124,12 @@ function AlumnoPanel() {
       </h1>
 
       {mensaje && <p className="mb-4 text-center text-red-600">{mensaje}</p>}
+
+      {documentos.length === 0 && (
+        <p className="text-center text-gray-600 mt-4">
+          📭 No hay documentos requeridos en este momento. Espera a que tu administrador los configure.
+        </p>
+      )}
 
       {documentos.map((doc) => (
         <div key={doc.id || doc.nombre} className="bg-white p-4 rounded-lg shadow mb-4">
