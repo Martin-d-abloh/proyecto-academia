@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 
 function SuperadminHome() {
   const [admins, setAdmins] = useState([])
-  const [nuevoAdmin, setNuevoAdmin] = useState({ nombre: "", contraseña: "" })
+  const [nuevoAdmin, setNuevoAdmin] = useState({ nombre: "", usuario: "", contraseña: "" })
   const [mensaje, setMensaje] = useState("")
   const token = localStorage.getItem("token")
   const superadminNombre = "Super Admin" // 👑 Nombre exacto del superadmin
@@ -37,7 +37,7 @@ function SuperadminHome() {
     const data = await res.json()
     if (res.ok) {
       setMensaje("✅ Admin creado")
-      setNuevoAdmin({ nombre: "", contraseña: "" })
+      setNuevoAdmin({ nombre: "", usuario: "", contraseña: "" })
       cargarAdmins()
     } else {
       setMensaje(`❌ Error: ${data.error}`)
@@ -61,6 +61,26 @@ function SuperadminHome() {
     }
   }
 
+  const verPanelDeAdmin = async (adminId) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/superadmin/panel_admin/${adminId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || "No se pudo acceder")
+
+      // Redirigir al panel del admin
+      navigate(`/admin/${adminId}`)
+    } catch (err) {
+      console.error("Error accediendo al panel del admin:", err)
+      setMensaje(`❌ ${err.message}`)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <h1 className="text-3xl font-bold text-blue-700 mb-4">
@@ -80,6 +100,17 @@ function SuperadminHome() {
           }
           className="px-3 py-1 border rounded"
         />
+
+        <input
+          type="text"
+          placeholder="Usuario"
+          value={nuevoAdmin.usuario}
+          onChange={(e) =>
+            setNuevoAdmin({ ...nuevoAdmin, usuario: e.target.value })
+          }
+          className="px-3 py-1 border rounded"
+        />
+
         <input
           type="password"
           placeholder="Contraseña"
@@ -89,6 +120,7 @@ function SuperadminHome() {
           }
           className="px-3 py-1 border rounded"
         />
+
         <button
           onClick={crearAdmin}
           className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700"
@@ -107,7 +139,7 @@ function SuperadminHome() {
             <span>{admin.nombre}</span>
             <div className="flex space-x-2">
               <button
-                onClick={() => navigate(`/admin/tabla/${admin.id}`)}
+                onClick={() => verPanelDeAdmin(admin.id)}
                 className="text-blue-600 underline"
               >
                 Ver

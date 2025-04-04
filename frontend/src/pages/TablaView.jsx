@@ -22,12 +22,18 @@ function TablaView() {
         const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        
+  
         if (!res.ok) {
-          navigate("/")
+          if (res.status === 403) {
+            localStorage.removeItem("token")
+            navigate("/")
+          } else {
+            const data = await res.json()
+            setMensaje(`❌ Error: ${data.error || "No se pudo cargar la tabla"}`)
+          }
           return
         }
-        
+  
         const data = await res.json()
         setTabla({
           nombre: data.nombre || "",
@@ -35,15 +41,16 @@ function TablaView() {
           alumnos: data.alumnos || [],
           subidos: data.subidos || []
         })
-        
+  
       } catch (error) {
         console.error("Error cargando tabla:", error)
         setMensaje("Error al cargar los datos")
       }
     }
-    
+  
     cargarTabla()
   }, [id, token])
+  
 
   const añadirDocumento = async () => {
     if (!nuevoDoc) return
@@ -103,7 +110,7 @@ const eliminarAlumno = async (alumnoId) => {
   if (!confirm("¿Eliminar este alumno permanentemente?")) return
   
   try {
-    const token = localStorage.getItem("token")
+    const token = localStorage.getItem("token_admin") || localStorage.getItem("token")
     const backupEstado = structuredClone(tabla) // 1. Backup del estado
 
     // 2. Eliminación optimista inmediata

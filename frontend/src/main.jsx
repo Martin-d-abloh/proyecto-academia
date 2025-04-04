@@ -21,6 +21,7 @@ createRoot(document.getElementById('root')).render(
         <Route path="/" element={<Layout />}>
           <Route index element={<Login tipo="admin" />} />
           <Route path="admin" element={<AdminHome />} />
+          <Route path="admin/:id" element={<AdminHome />} />
           <Route path="superadmin" element={<SuperadminHome />} />
           <Route path="admin/tabla/:id" element={<TablaView />} />
           <Route path="alumno/:id" element={<AlumnoPanel />} />

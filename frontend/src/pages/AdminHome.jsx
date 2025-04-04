@@ -1,24 +1,39 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 
 function AdminHome() {
   const [tablas, setTablas] = useState([])
   const [nuevaTabla, setNuevaTabla] = useState("")
   const [mensaje, setMensaje] = useState("")
   const navigate = useNavigate()
+  const { id } = useParams()  // Si el superadmin accede al panel de un admin
 
   const token = localStorage.getItem("token")
 
   useEffect(() => {
-    fetch("http://localhost:5001/api/admin/tablas", {
+    const url = id
+      ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
+      : `http://localhost:5001/api/admin/tablas`
+
+    fetch(url, {
       headers: {
-        "Authorization": `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       }
     })
       .then((res) => res.json())
-      .then((data) => setTablas(data.tablas))
-      .catch((err) => console.error("Error cargando tablas:", err))
-  }, [])
+      .then((data) => {
+        if (data.error) {
+          setMensaje(`❌ ${data.error}`)
+          setTablas([])
+        } else {
+          setTablas(data.tablas || [])
+        }
+      })
+      .catch((err) => {
+        console.error("Error cargando tablas:", err)
+        setMensaje("❌ Error cargando tablas")
+      })
+  }, [token, id])
 
   const crearTabla = async () => {
     if (!nuevaTabla) return
@@ -27,7 +42,7 @@ function AdminHome() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({ nombre: nuevaTabla })
     })
@@ -36,34 +51,44 @@ function AdminHome() {
     if (res.ok) {
       setMensaje("✅ Tabla creada")
       setNuevaTabla("")
-      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", {
-        headers: {
-          "Authorization": `Bearer ${token}`
+      const nuevas = await fetch(
+        id
+          ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
+          : "http://localhost:5001/api/admin/tablas",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      }).then((r) => r.json())
-      setTablas(nuevas.tablas)
+      ).then((r) => r.json())
+      setTablas(nuevas.tablas || [])
     } else {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
 
-  const eliminarTabla = async (id) => {
-    const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
+  const eliminarTabla = async (tablaId) => {
+    const res = await fetch(`http://localhost:5001/api/admin/tabla/${tablaId}`, {
       method: "DELETE",
       headers: {
-        "Authorization": `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       }
     })
 
     const data = await res.json()
     if (res.ok) {
       setMensaje("🗑️ Tabla eliminada")
-      const nuevas = await fetch("http://localhost:5001/api/admin/tablas", {
-        headers: {
-          "Authorization": `Bearer ${token}`
+      const nuevas = await fetch(
+        id
+          ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
+          : "http://localhost:5001/api/admin/tablas",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      }).then((r) => r.json())
-      setTablas(nuevas.tablas)
+      ).then((r) => r.json())
+      setTablas(nuevas.tablas || [])
     } else {
       setMensaje(`❌ Error: ${data.error}`)
     }
