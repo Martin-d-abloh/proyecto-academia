@@ -14,26 +14,26 @@ function AlumnoPanel() {
       navigate("/login_alumno")
       return
     }
-  
+
     const cargarDocumentos = async () => {
       try {
         const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-  
+
         if (!response.ok) {
           const text = await response.text()
           console.error("Respuesta completa del backend:", text)
-  
+
           if (response.status === 403) {
             localStorage.removeItem("token_alumno")
             navigate("/login_alumno")
             return
           }
-  
+
           throw new Error("Error del backend al cargar documentos")
         }
-  
+
         const data = await response.json()
         setDocumentos(data.documentos || [])
       } catch (err) {
@@ -41,11 +41,9 @@ function AlumnoPanel() {
         setMensaje(`❌ ${err.message}`)
       }
     }
-  
+
     cargarDocumentos()
   }, [id, navigate])
-  
-  
 
   const handleFileChange = (nombre, archivo) => {
     setArchivos(prev => ({ ...prev, [nombre]: archivo }))
@@ -116,12 +114,10 @@ function AlumnoPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-green-50 p-6">
-      <h1 className="text-3xl font-bold text-green-700 mb-6">
-        Panel del Alumno #{id}
-      </h1>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
+      <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno #{id}</h1>
 
-      {mensaje && <p className="mb-4 text-center text-red-600">{mensaje}</p>}
+      {mensaje && <p className="mb-4 text-center text-green-800 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">{mensaje}</p>}
 
       {documentos.length === 0 && (
         <p className="text-center text-gray-600 mt-4">
@@ -130,21 +126,21 @@ function AlumnoPanel() {
       )}
 
       {documentos.map((doc) => (
-        <div key={doc.id || doc.nombre} className="bg-white p-4 rounded-lg shadow mb-4">
-          <h2 className="text-xl font-semibold">{doc.nombre}</h2>
+        <div key={doc.id || doc.nombre} className="bg-white p-5 rounded-xl shadow-md mb-6 border-l-4 border-green-300">
+          <h2 className="text-xl font-bold text-green-800 mb-1">📁 {doc.nombre}</h2>
           <p className="mb-2">
-            Estado:{" "}
-            {doc.estado === "subido" && "📄 Subido"}
-            {doc.estado === "aceptado" && "✅ Aceptado"}
-            {doc.estado === "rechazado" && "❌ Rechazado"}
-            {doc.estado === "no_subido" && "⚠️ No subido"}
+            Estado: {" "}
+            {doc.estado === "subido" && <span className="text-blue-600 font-semibold">📄 Subido</span>}
+            {doc.estado === "aceptado" && <span className="text-green-600 font-semibold">✅ Aceptado</span>}
+            {doc.estado === "rechazado" && <span className="text-red-600 font-semibold">❌ Rechazado</span>}
+            {doc.estado === "no_subido" && <span className="text-yellow-600 font-semibold">⚠️ No subido</span>}
           </p>
 
           {doc.subido && (
-            <div className="flex items-center space-x-4 mt-2">
+            <div className="flex flex-wrap items-center gap-4 mt-2">
               <a
                 href={`/descargar/${doc.id}`}
-                className="text-blue-600 hover:text-blue-800 underline"
+                className="bg-blue-100 text-blue-700 px-4 py-1 rounded hover:bg-blue-200 text-sm"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -152,14 +148,14 @@ function AlumnoPanel() {
               </a>
               <button
                 onClick={() => eliminarDocumento(doc.id)}
-                className="text-red-600 hover:text-red-800 underline"
+                className="bg-red-100 text-red-700 px-4 py-1 rounded hover:bg-red-200 text-sm"
               >
-                Eliminar documento
+                🗑️ Eliminar documento
               </button>
             </div>
           )}
 
-          <div className="mt-3">
+          <div className="mt-4">
             <input
               type="file"
               onChange={(e) => handleFileChange(doc.nombre, e.target.files[0])}
@@ -167,23 +163,23 @@ function AlumnoPanel() {
             />
             <button
               onClick={() => handleUpload(doc.nombre)}
-              className="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+              className="mt-3 w-full bg-green-600 text-white font-semibold px-4 py-2 rounded hover:bg-green-700 shadow"
             >
-              Subir documento
+              🚀 Subir documento
             </button>
           </div>
         </div>
       ))}
 
-      <div className="mt-6 text-center">
+      <div className="mt-8 text-center">
         <button
           onClick={() => {
             localStorage.removeItem("token_alumno")
             navigate("/login_alumno")
           }}
-          className="text-red-600 hover:text-red-800 underline"
+          className="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200 shadow"
         >
-          Cerrar sesión
+          🔒 Cerrar sesión
         </button>
       </div>
     </div>
