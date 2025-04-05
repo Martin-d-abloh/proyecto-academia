@@ -1,11 +1,12 @@
 import os
 import jwt
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, g, current_app as app
+from flask import Blueprint, request, jsonify, g, send_file, current_app as app
 from models import Alumno, Documento, Tabla
 from decoradores import alumno_token_required
 from utils import generar_hash_credencial, normalizar
 from models import db
+import mimetypes
 
 alumno_bp = Blueprint("alumno_bp", __name__)
 
@@ -177,3 +178,28 @@ def api_login_alumno():
         return jsonify({"token": token, "alumno_id": alumno.id})
 
     return jsonify({"error": "Credenciales incorrectas"}), 401
+
+@alumno_bp.route("/api/alumno/ver/<int:doc_id>")
+def ver_documento_alumno(doc_id):
+    token = request.args.get("token")
+
+    if not token:
+        return jsonify({"error": "Token requerido"}), 401
+
+    try:
+        payload = jwt.decode(token, os.getenv("JWT_SECRET_KEY"), algorithms=["HS256"])
+        alumno_id = payload.get("alumno_id")
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expirado"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Token inválido"}), 403
+
+    doc = Documento.query.get_or_404(doc_id)
+    if str(doc.alumno_id) != str(alumno_id):
+        return jsonify({"error": "No tienes permiso para ver este documento"}), 403
+
+    if not os.path.exists(doc.ruta):
+        return jsonify({"error": "Archivo no encontrado"}), 404
+
+    mimetype, _ = mimetypes.guess_type(doc.ruta)
+    return send_file(doc.ruta, mimetype=mimetype or "application/octet-stream")

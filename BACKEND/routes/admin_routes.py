@@ -9,7 +9,7 @@ from decoradores import token_required, superadmin_token_required
 from utils import generar_hash_credencial, normalizar
 from dotenv import load_dotenv
 from sqlalchemy.exc import IntegrityError
-
+import mimetypes
 
 admin_bp = Blueprint("admin_bp", __name__)
 
@@ -392,6 +392,42 @@ def descargar_documento(current_user, documento_id):
             'detalle': str(e)
         }), 500
 
+
+@admin_bp.route('/api/admin/documento/<int:documento_id>/ver', methods=['GET'])
+def ver_documento_admin(documento_id):
+    token = request.args.get("token")
+
+    if not token:
+        return jsonify({"error": "Token requerido"}), 401
+
+    try:
+        payload = jwt.decode(token, os.getenv("JWT_SECRET_KEY"), algorithms=["HS256"])
+        # Aquí podrías validar permisos si lo necesitas (ej: superadmin o admin)
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expirado"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Token inválido"}), 403
+
+    doc = Documento.query.get_or_404(documento_id)
+    ruta_completa = os.path.join(os.getcwd(), doc.ruta)
+
+    print(f"👁️ Intentando mostrar archivo: {ruta_completa}")
+
+    if not os.path.exists(ruta_completa):
+        return jsonify({'error': 'El archivo no se encuentra en el servidor'}), 404
+
+    try:
+        mimetype, _ = mimetypes.guess_type(ruta_completa)
+        return send_file(
+            ruta_completa,
+            mimetype=mimetype or "application/octet-stream"
+        )
+    except Exception as e:
+        print(f"🔥 Error al mostrar archivo: {e}")
+        return jsonify({
+            'error': 'Error al mostrar el archivo',
+            'detalle': str(e)
+        }), 500
 
 
 

@@ -1,3 +1,4 @@
+// TablaView.jsx
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 
@@ -40,7 +41,6 @@ function TablaView() {
         alumnos: data.alumnos || [],
         subidos: data.subidos || []
       })
-
     } catch (error) {
       console.error("Error cargando tabla:", error)
       setMensaje("Error al cargar los datos")
@@ -50,6 +50,12 @@ function TablaView() {
   useEffect(() => {
     cargarTabla()
   }, [id, token])
+
+  const documentosMap = tabla.subidos.reduce((acc, d) => {
+    acc[d.alumno_id] = acc[d.alumno_id] || {}
+    acc[d.alumno_id][d.nombre] = d
+    return acc
+  }, {})
 
   const añadirDocumento = async () => {
     if (!nuevoDoc) return
@@ -149,12 +155,10 @@ function TablaView() {
     }
   }
 
-  const descargarDocumento = async (id) => {
+  const descargarDocumento = async (id, nombreAlumno, nombreDoc) => {
     try {
       const res = await fetch(`http://localhost:5001/api/admin/documento/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!res.ok) throw new Error("Error al descargar archivo")
@@ -162,8 +166,9 @@ function TablaView() {
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
+      const nombreFormateado = `${nombreAlumno}-${nombreDoc}`.replace(/\s+/g, "_")
       a.href = url
-      a.download = "documento.pdf"
+      a.download = `${nombreFormateado}.pdf`
       a.click()
       window.URL.revokeObjectURL(url)
     } catch (err) {
@@ -172,24 +177,22 @@ function TablaView() {
     }
   }
 
-  const documentosMap = tabla.subidos.reduce((acc, d) => {
-    acc[d.alumno_id] = acc[d.alumno_id] || {}
-    acc[d.alumno_id][d.nombre] = d
-    return acc
-  }, {})
+  const verDocumento = (docId) => {
+    const url = `http://localhost:5001/api/admin/documento/${docId}/ver?token=${token}`
+    window.open(url, "_blank")
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 p-6">
       <h1 className="text-3xl font-bold text-blue-800 mb-6 drop-shadow">📄 {tabla.nombre}</h1>
       {mensaje && <div className="mb-4 text-green-700 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">{mensaje}</div>}
 
-      <h2 className="text-xl font-semibold text-blue-700 mb-2">👨‍🎓 Alumnos</h2>
       <div className="overflow-x-auto w-full max-w-full border rounded-xl shadow">
         <table className="w-full table-auto border-collapse bg-white">
           <thead className="bg-blue-100 text-blue-800 uppercase">
             <tr>
               <th className="border px-4 py-2 text-left">Nombre</th>
-              {tabla.documentos?.map((doc) => (
+              {tabla.documentos.map((doc) => (
                 <th key={doc.id} className="border px-4 py-2 text-left">
                   {doc.nombre}
                   <button
@@ -206,59 +209,68 @@ function TablaView() {
             </tr>
           </thead>
           <tbody>
-            {tabla.alumnos?.map((a) => (
-              <tr key={a.id} className="hover:bg-gray-50">
-                <td className="border px-4 py-2 whitespace-nowrap">{a.nombre} {a.apellidos}</td>
-                {tabla.documentos.map((doc) => {
-                  const d = documentosMap[a.id]?.[doc.nombre]
-                  return (
-                    <td key={doc.id} className="border px-4 py-2 text-center whitespace-nowrap">
-                      {d ? (
-                        <>
-                          {d.estado === "aceptado"
-                            ? <span className="text-green-600 font-semibold">✅ Validado</span>
-                            : d.estado === "subido"
-                            ? <span className="text-blue-600">✅ Subido</span>
-                            : <span className="text-red-600">❌ Rechazado</span>}
-                          <br />
-                          <button
-                            onClick={() => descargarDocumento(d.id)}
-                            className="text-blue-600 underline text-sm hover:text-blue-800"
-                          >
-                            📥 Descargar
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-red-500">❌ No entregado</span>
-                      )}
-                    </td>
-                  )
-                })}
-                <td className="border px-4 py-2 text-center">
-                  {documentosMap[a.id] &&
-                  Object.keys(documentosMap[a.id]).length === tabla.documentos.length
-                    ? <span className="text-green-600 font-bold">✅</span>
-                    : <span className="text-red-600 font-bold">❌</span>}
-                </td>
-                <td className="border px-4 py-2 text-center">
-                  <a href={`/alumno/${a.id}`} className="text-blue-600 underline hover:text-blue-800">
-                    Acceder
-                  </a>
-                </td>
-                <td className="border px-4 py-2 text-center">
-                  <button
-                    className="text-red-600 hover:text-red-800"
-                    onClick={() => eliminarAlumno(a.id)}
-                  >
-                    🗑️
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {tabla.alumnos.map((a) => {
+              const subidos = documentosMap[a.id] || {}
+              const todosSubidos = tabla.documentos.every(doc => subidos[doc.nombre])
+              return (
+                <tr key={a.id} className="hover:bg-gray-50">
+                  <td className="border px-4 py-2 whitespace-nowrap">{a.nombre} {a.apellidos}</td>
+                  {tabla.documentos.map((doc) => {
+                    const d = subidos[doc.nombre]
+                    return (
+                      <td key={doc.id} className="border px-4 py-2 text-center whitespace-nowrap">
+                        {d ? (
+                          <>
+                            <span className={
+                              d.estado === "aceptado"
+                                ? "text-green-600 font-semibold"
+                                : d.estado === "subido"
+                                ? "text-blue-600"
+                                : "text-red-600"
+                            }>
+                              {d.estado === "aceptado" ? "✅ Validado" : d.estado === "subido" ? "✅ Subido" : "❌ Rechazado"}
+                            </span>
+                            <br />
+                            <div className="flex flex-col items-center gap-1 mt-1">
+                              <button
+                                onClick={() => verDocumento(d.id)}
+                                className="text-blue-600 underline text-sm hover:text-blue-800"
+                              >
+                                Ver
+                              </button>
+                              <button
+                                onClick={() => descargarDocumento(d.id, `${a.nombre} ${a.apellidos}`, doc.nombre)}
+                                className="text-blue-600 underline text-sm hover:text-blue-800"
+                              >
+                                📥 Descargar
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-red-500">❌ No entregado</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                  <td className="border px-4 py-2 text-center">
+                    {todosSubidos
+                      ? <span className="text-green-600 font-bold">✅</span>
+                      : <span className="text-red-600 font-bold">❌</span>}
+                  </td>
+                  <td className="border px-4 py-2 text-center">
+                    <a href={`/alumno/${a.id}`} className="text-blue-600 underline hover:text-blue-800">Acceder</a>
+                  </td>
+                  <td className="border px-4 py-2 text-center">
+                    <button onClick={() => eliminarAlumno(a.id)} className="text-red-600 hover:text-red-800">🗑️</button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* SECCIÓN AÑADIR DOCUMENTO */}
       <div className="mt-6">
         <h3 className="text-lg font-semibold text-blue-700 mb-2">➕ Añadir nuevo documento</h3>
         <div className="flex flex-wrap gap-3">
@@ -278,6 +290,7 @@ function TablaView() {
         </div>
       </div>
 
+      {/* SECCIÓN AÑADIR ALUMNO */}
       <div className="mt-6">
         <h3 className="text-lg font-semibold text-blue-700 mb-2">➕ Añadir nuevo alumno</h3>
         <div className="flex flex-wrap gap-3">
