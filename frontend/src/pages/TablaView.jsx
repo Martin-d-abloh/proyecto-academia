@@ -154,6 +154,30 @@ function TablaView() {
     }
   }
 
+  const descargarDocumento = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/admin/documento/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+  
+      if (!res.ok) throw new Error("Error al descargar archivo")
+  
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "documento.pdf" // puedes cambiar si tienes el nombre real
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Error al descargar documento:", err)
+      setMensaje("❌ Error al descargar")
+    }
+  }
+  
+
   const documentosMap = tabla.subidos.reduce((acc, d) => {
     acc[d.alumno_id] = acc[d.alumno_id] || {}
     acc[d.alumno_id][d.nombre] = d
@@ -202,7 +226,12 @@ function TablaView() {
                           ? "✅ Subido"
                           : "❌ Rechazado"}
                         <br />
-                        <a href={`http://localhost:5001/descargar/${d.id}`}>📥 Descargar</a>
+                        <button
+                          onClick={() => descargarDocumento(d.id)}
+                          className="text-blue-600 underline"
+                        >
+                          📥 Descargar
+                        </button>
                       </>
                     ) : (
                       "❌ No entregado"

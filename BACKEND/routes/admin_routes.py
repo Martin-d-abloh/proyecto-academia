@@ -1,7 +1,7 @@
 import os
 import jwt
 from datetime import datetime, timedelta, timezone
-from flask import Blueprint, request, jsonify, g, current_app as app
+from flask import Blueprint, request, jsonify, g, send_file, current_app as app
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from models import db, Tabla, Documento, Administrador, Alumno
@@ -369,6 +369,30 @@ def eliminar_alumno_de_tabla(current_admin, id_tabla, id_alumno):
     except Exception as e:
         print("Error eliminando alumno:", e)
         return jsonify({"error": "Error eliminando alumno"}), 500
+    
+@admin_bp.route('/api/admin/documento/<int:documento_id>', methods=['GET'])
+@token_required
+def descargar_documento(current_user, documento_id):
+    doc = Documento.query.get_or_404(documento_id)
+
+    ruta_completa = os.path.join(os.getcwd(), doc.ruta)
+
+    print(f"🪵 Intentando enviar archivo: {ruta_completa}")
+
+    if not os.path.exists(ruta_completa):
+        print("❌ Archivo no encontrado")
+        return jsonify({'error': 'El archivo no se encuentra en el servidor'}), 404
+
+    try:
+        return send_file(ruta_completa, as_attachment=True)
+    except Exception as e:
+        print(f"🔥 Error en send_file: {e}")
+        return jsonify({
+            'error': 'Error al descargar el archivo',
+            'detalle': str(e)
+        }), 500
+
+
 
 
 
