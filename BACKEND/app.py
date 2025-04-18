@@ -12,7 +12,8 @@ def create_app():
     load_dotenv()
 
     app = Flask(__name__)
-    CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+    frontend_url = os.getenv("FRONTEND_URL", "https://proyecto-academia.vercel.app")
+    CORS(app, resources={r"/api/*": {"origins": frontend_url}}, supports_credentials=True)
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'app.db')}"
