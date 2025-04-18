@@ -13,8 +13,11 @@ def create_app():
 
     app = Flask(__name__)
     frontend_url = os.getenv("FRONTEND_URL", "https://proyecto-academia.vercel.app")
-    CORS(app, resources={r"/api/*": {"origins": frontend_url}}, supports_credentials=True)
-
+    CORS(app, resources={r"/api/*": {"origins": [
+        "https://proyecto-academia.duckdns.org",
+        "https://proyecto-academia.vercel.app"
+    ]}}, supports_credentials=True)
+    
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'app.db')}"
     app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
