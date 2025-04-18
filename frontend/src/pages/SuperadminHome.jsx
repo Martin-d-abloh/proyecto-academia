@@ -14,16 +14,16 @@ function SuperadminHome() {
   }, [])
 
   const cargarAdmins = () => {
-    fetch("http://localhost:5001/api/superadmin/admins", {
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/api/superadmin/admins`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setAdmins(data.admins))
       .catch((err) => console.error("Error cargando admins:", err))
   }
-
+  
   const crearAdmin = async () => {
-    const res = await fetch("http://localhost:5001/api/superadmin/admins", {
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/superadmin/admins`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -31,7 +31,7 @@ function SuperadminHome() {
       },
       body: JSON.stringify(nuevoAdmin),
     })
-
+  
     const data = await res.json()
     if (res.ok) {
       setMensaje("✅ Admin creado")
@@ -41,13 +41,13 @@ function SuperadminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
-
+  
   const eliminarAdmin = async (id) => {
-    const res = await fetch(`http://localhost:5001/api/superadmin/admins/${id}`, {
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/superadmin/admins/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     })
-
+  
     const data = await res.json()
     if (res.ok) {
       setMensaje("🗑️ Admin eliminado")
@@ -56,22 +56,23 @@ function SuperadminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
-
+  
   const verPanelDeAdmin = async (adminId) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/superadmin/panel_admin/${adminId}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/superadmin/panel_admin/${adminId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
+  
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "No se pudo acceder")
-
+  
       navigate(`/admin/${adminId}`)
     } catch (err) {
       console.error("Error accediendo al panel del admin:", err)
       setMensaje(`❌ ${err.message}`)
     }
   }
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-indigo-200 p-6">

@@ -19,23 +19,23 @@ function AlumnoPanel() {
 
     const cargarDocumentos = async () => {
       try {
-        const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}/documentos`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-
+    
         if (!response.ok) {
           const text = await response.text()
           console.error("Respuesta completa del backend:", text)
-
+    
           if (response.status === 403) {
             localStorage.removeItem("token_alumno")
             navigate("/login_alumno")
             return
           }
-
+    
           throw new Error("Error del backend al cargar documentos")
         }
-
+    
         const data = await response.json()
         setDocumentos(data.documentos || [])
       } catch (err) {
@@ -43,83 +43,84 @@ function AlumnoPanel() {
         setMensaje(`❌ ${err.message}`)
       }
     }
-
+    
     cargarDocumentos()
-  }, [id, navigate])
-
-  const handleFileChange = (nombre, archivo) => {
-    setArchivos(prev => ({ ...prev, [nombre]: archivo }))
-  }
-
-  const actualizarDocumentos = async () => {
-    const token = localStorage.getItem("token_alumno")
-    const response = await fetch(`http://localhost:5001/api/alumno/${id}/documentos`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    const data = await response.json()
-    setDocumentos(data.documentos)
-  }
-
-  const verDocumento = (docId) => {
-    const token = localStorage.getItem("token_alumno")
-    const url = `http://localhost:5001/api/alumno/ver/${docId}?token=${token}`
-    window.open(url, "_blank")
-  }
-  
-  const handleUpload = async (nombre) => {
-    try {
-      const archivo = archivos[nombre]
-      if (!archivo) {
-        setMensaje("⚠️ Selecciona un archivo antes de subir.")
-        return
-      }
-
-      const formData = new FormData()
-      formData.append("archivo", archivo)
-      formData.append("nombre_documento", nombre)
-
+    }, [id, navigate])
+    
+    const handleFileChange = (nombre, archivo) => {
+      setArchivos(prev => ({ ...prev, [nombre]: archivo }))
+    }
+    
+    const actualizarDocumentos = async () => {
       const token = localStorage.getItem("token_alumno")
-      const res = await fetch(`http://localhost:5001/api/alumno/${id}/subir`, {
-        method: "POST",
-        body: formData,
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}/documentos`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Error al subir el documento")
-      }
-
-      setMensaje("✅ Documento subido correctamente.")
-      await actualizarDocumentos()
-
-    } catch (err) {
-      console.error("Error en subida:", err)
-      setMensaje(`❌ Error: ${err.message}`)
+      const data = await response.json()
+      setDocumentos(data.documentos)
     }
-  }
-
-  const eliminarDocumento = async (docId) => {
-    try {
+    
+    const verDocumento = (docId) => {
       const token = localStorage.getItem("token_alumno")
-      const res = await fetch(`http://localhost:5001/api/alumno/${id}/documentos/${docId}/eliminar`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || "Error al eliminar")
-      }
-
-      await actualizarDocumentos()
-      setMensaje("🗑️ Documento eliminado.")
-
-    } catch (err) {
-      console.error("Error eliminando:", err)
-      setMensaje(`❌ Error: ${err.message}`)
+      const url = `${import.meta.env.VITE_BACKEND_URL}/api/alumno/ver/${docId}?token=${token}`
+      window.open(url, "_blank")
     }
-  }
+    
+    const handleUpload = async (nombre) => {
+      try {
+        const archivo = archivos[nombre]
+        if (!archivo) {
+          setMensaje("⚠️ Selecciona un archivo antes de subir.")
+          return
+        }
+    
+        const formData = new FormData()
+        formData.append("archivo", archivo)
+        formData.append("nombre_documento", nombre)
+    
+        const token = localStorage.getItem("token_alumno")
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}/subir`, {
+          method: "POST",
+          body: formData,
+          headers: { Authorization: `Bearer ${token}` }
+        })
+    
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || "Error al subir el documento")
+        }
+    
+        setMensaje("✅ Documento subido correctamente.")
+        await actualizarDocumentos()
+    
+      } catch (err) {
+        console.error("Error en subida:", err)
+        setMensaje(`❌ Error: ${err.message}`)
+      }
+    }
+    
+    const eliminarDocumento = async (docId) => {
+      try {
+        const token = localStorage.getItem("token_alumno")
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}/documentos/${docId}/eliminar`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        })
+    
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || "Error al eliminar")
+        }
+    
+        await actualizarDocumentos()
+        setMensaje("🗑️ Documento eliminado.")
+    
+      } catch (err) {
+        console.error("Error eliminando:", err)
+        setMensaje(`❌ Error: ${err.message}`)
+      }
+    }
+    
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">

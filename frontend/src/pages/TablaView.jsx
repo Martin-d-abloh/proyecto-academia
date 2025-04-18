@@ -19,10 +19,10 @@ function TablaView() {
 
   const cargarTabla = async () => {
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
+  
       if (!res.ok) {
         if (res.status === 403) {
           localStorage.removeItem("token")
@@ -33,7 +33,7 @@ function TablaView() {
         }
         return
       }
-
+  
       const data = await res.json()
       setTabla({
         nombre: data.nombre || "",
@@ -46,21 +46,21 @@ function TablaView() {
       setMensaje("Error al cargar los datos")
     }
   }
-
+  
   useEffect(() => {
     cargarTabla()
   }, [id, token])
-
+  
   const documentosMap = tabla.subidos.reduce((acc, d) => {
     acc[d.alumno_id] = acc[d.alumno_id] || {}
     acc[d.alumno_id][d.nombre] = d
     return acc
   }, {})
-
+  
   const añadirDocumento = async () => {
     if (!nuevoDoc) return
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/documento`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}/documento`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -69,7 +69,7 @@ function TablaView() {
         body: JSON.stringify({ nombre: nuevoDoc }),
       })
       const data = await res.json()
-
+  
       if (res.ok) {
         setMensaje("✅ Documento añadido")
         setNuevoDoc("")
@@ -81,15 +81,15 @@ function TablaView() {
       console.error("Error añadiendo documento:", err)
     }
   }
-
+  
   const eliminarDocumento = async (docId) => {
     if (!confirm("¿Eliminar este documento?")) return
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/documento/${docId}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}/documento/${docId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-
+  
       if (!res.ok) throw new Error("Error del servidor")
       setMensaje("✅ Documento eliminado")
       await cargarTabla()
@@ -97,26 +97,26 @@ function TablaView() {
       setMensaje(`❌ Error: ${err.message}`)
     }
   }
-
+  
   const eliminarAlumno = async (alumnoId) => {
     if (!confirm("¿Eliminar este alumno permanentemente?")) return
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/alumno/${alumnoId}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}/alumno/${alumnoId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         }
       })
-
+  
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: "Error desconocido" }))
         throw new Error(errorData.error || `Error HTTP: ${res.status}`)
       }
-
+  
       setMensaje("✅ Alumno eliminado exitosamente")
       await cargarTabla()
-
+  
     } catch (err) {
       console.error("Error en eliminación:", err)
       setMensaje(`❌ ${err.message || "Error al eliminar"}`)
@@ -125,15 +125,15 @@ function TablaView() {
       }
     }
   }
-
+  
   const añadirAlumno = async () => {
     if (!nuevoAlumno.nombre || !nuevoAlumno.apellidos) {
       setMensaje("⚠️ Faltan nombre o apellidos")
       return
     }
-
+  
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/tabla/${id}/alumnos`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}/alumnos`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -142,7 +142,7 @@ function TablaView() {
         body: JSON.stringify(nuevoAlumno)
       })
       const data = await res.json()
-
+  
       if (res.ok) {
         setMensaje("✅ Alumno añadido")
         setNuevoAlumno({ nombre: "", apellidos: "" })
@@ -154,15 +154,15 @@ function TablaView() {
       console.error("Error añadiendo alumno:", err)
     }
   }
-
+  
   const descargarDocumento = async (id, nombreAlumno, nombreDoc) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/documento/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/documento/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-
+  
       if (!res.ok) throw new Error("Error al descargar archivo")
-
+  
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -176,11 +176,12 @@ function TablaView() {
       setMensaje("❌ Error al descargar")
     }
   }
-
+  
   const verDocumento = (docId) => {
-    const url = `http://localhost:5001/api/admin/documento/${docId}/ver?token=${token}`
+    const url = `${import.meta.env.VITE_BACKEND_URL}/api/admin/documento/${docId}/ver?token=${token}`
     window.open(url, "_blank")
   }
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 p-6">

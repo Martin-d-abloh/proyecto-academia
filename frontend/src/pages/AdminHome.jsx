@@ -12,9 +12,9 @@ function AdminHome() {
 
   useEffect(() => {
     const url = id
-      ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
-      : `http://localhost:5001/api/admin/tablas`
-
+      ? `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas?admin_id=${id}`
+      : `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas`
+  
     fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`
@@ -34,11 +34,11 @@ function AdminHome() {
         setMensaje("❌ Error cargando tablas")
       })
   }, [token, id])
-
+  
   const crearTabla = async () => {
     if (!nuevaTabla) return
-
-    const res = await fetch("http://localhost:5001/api/admin/tablas", {
+  
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -46,15 +46,15 @@ function AdminHome() {
       },
       body: JSON.stringify({ nombre: nuevaTabla })
     })
-
+  
     const data = await res.json()
     if (res.ok) {
       setMensaje("✅ Tabla creada")
       setNuevaTabla("")
       const nuevas = await fetch(
         id
-          ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
-          : "http://localhost:5001/api/admin/tablas",
+          ? `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas?admin_id=${id}`
+          : `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -66,22 +66,22 @@ function AdminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
-
+  
   const eliminarTabla = async (tablaId) => {
-    const res = await fetch(`http://localhost:5001/api/admin/tabla/${tablaId}`, {
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${tablaId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`
       }
     })
-
+  
     const data = await res.json()
     if (res.ok) {
       setMensaje("🗑️ Tabla eliminada")
       const nuevas = await fetch(
         id
-          ? `http://localhost:5001/api/admin/tablas?admin_id=${id}`
-          : "http://localhost:5001/api/admin/tablas",
+          ? `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas?admin_id=${id}`
+          : `${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -93,6 +93,7 @@ function AdminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-100 p-6">

@@ -13,14 +13,14 @@ function Login({ tipo = 'admin' }) {
 
     try {
       if (esAdmin) {
-        const res = await fetch("http://localhost:5001/api/login", {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ usuario, contrasena: password })
         })
-
+    
         const data = await res.json()
-
+    
         if (res.ok && data.token) {
           localStorage.setItem("token", data.token)
           const decoded = JSON.parse(atob(data.token.split('.')[1]))
@@ -29,12 +29,13 @@ function Login({ tipo = 'admin' }) {
           alert(`❌ ${data.error || "Credenciales incorrectas"}`)
         }
       } else {
-        const res = await fetch("http://localhost:5001/api/login_alumno", {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/login_alumno`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ credencial: usuario })
         })
+    
 
         const data = await res.json()
         if (res.ok) {

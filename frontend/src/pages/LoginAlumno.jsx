@@ -10,11 +10,12 @@ function LoginAlumno() {
     e.preventDefault()
 
     try {
-      const res = await fetch("http://localhost:5001/api/login_alumno", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/login_alumno`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credencial })
       })
+    
 
       const data = await res.json()
 
