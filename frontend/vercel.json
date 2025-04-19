@@ -2,20 +2,17 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    
     { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/**", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" },
     { "source": "/admin/tabla", "destination": "/index.html" },
     { "source": "/admin/tabla/:id", "destination": "/index.html" },
 
-    
     { "source": "/superadmin", "destination": "/index.html" },
-    { "source": "/superadmin/**", "destination": "/index.html" },
+    { "source": "/superadmin/:path*", "destination": "/index.html" },
 
-   
     { "source": "/alumno", "destination": "/index.html" },
     { "source": "/alumno/:id", "destination": "/index.html" },
-    { "source": "/alumno/**", "destination": "/index.html" }
+    { "source": "/alumno/:path*", "destination": "/index.html" }
   ],
   "headers": [
     {
