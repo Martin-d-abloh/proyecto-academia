@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/admin/**", "destination": "/index.html" },
+    { "source": "/admin/tabla/**", "destination": "/index.html" },
     { "source": "/superadmin", "destination": "/index.html" },
     { "source": "/superadmin/**", "destination": "/index.html" },
     { "source": "/alumno", "destination": "/index.html" },
