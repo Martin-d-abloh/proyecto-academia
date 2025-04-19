@@ -1,8 +1,10 @@
 {
-    "rewrites": [
-      { "source": "/admin", "destination": "/index.html" },
-      { "source": "/superadmin", "destination": "/index.html" },
-      { "source": "/alumno/:id*", "destination": "/index.html" }
-    ]
-  }
-  
+  "rewrites": [
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/**", "destination": "/index.html" },
+    { "source": "/superadmin", "destination": "/index.html" },
+    { "source": "/superadmin/**", "destination": "/index.html" },
+    { "source": "/alumno", "destination": "/index.html" },
+    { "source": "/alumno/**", "destination": "/index.html" }
+  ]
+}
