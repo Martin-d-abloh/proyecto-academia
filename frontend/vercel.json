@@ -4,24 +4,11 @@
   "rewrites": [
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/admin/:path*", "destination": "/index.html" },
-    { "source": "/admin/tabla", "destination": "/index.html" },
-    { "source": "/admin/tabla/:id", "destination": "/index.html" },
 
     { "source": "/superadmin", "destination": "/index.html" },
     { "source": "/superadmin/:path*", "destination": "/index.html" },
 
     { "source": "/alumno", "destination": "/index.html" },
-    { "source": "/alumno/:id", "destination": "/index.html" },
     { "source": "/alumno/:path*", "destination": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS, PUT, DELETE" },
-        { "key": "Access-Control-Allow-Headers", "value": "Origin, Content-Type, Accept, Authorization" }
-      ]
-    }
   ]
 }
