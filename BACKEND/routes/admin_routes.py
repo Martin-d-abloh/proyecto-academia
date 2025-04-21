@@ -42,8 +42,8 @@ def api_login_admin():
 @token_required
 def api_crear_alumno(current_admin, id_tabla):
     data = request.get_json()
-    nombre = data.get("nombre")
-    apellidos = data.get("apellidos")
+    nombre = data.get("nombre", "").strip()  # Sanitización de espacios
+    apellidos = data.get("apellidos", "").strip()  # Sanitización de espacios
 
     if not nombre or not apellidos:
         return jsonify({"error": "Faltan datos del alumno"}), 400
@@ -53,8 +53,9 @@ def api_crear_alumno(current_admin, id_tabla):
     if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
         return jsonify({"error": "Acceso denegado"}), 403
 
+    # Generación de credencial y contraseña (sin espacios)
     credencial = generar_hash_credencial(normalizar(nombre), normalizar(apellidos))
-    password_claro = f"{nombre} {apellidos}".strip()
+    password_claro = f"{nombre}{apellidos}"  # <- Cambio clave: sin espacios
 
     nuevo = Alumno(
         nombre=nombre,
@@ -62,12 +63,17 @@ def api_crear_alumno(current_admin, id_tabla):
         tabla_id=id_tabla,
         credencial=credencial
     )
-    nuevo.set_password(password_claro)
+    nuevo.set_password(password_claro)  # Almacena el hash, no el texto plano
 
     db.session.add(nuevo)
     db.session.commit()
 
-    return jsonify({"mensaje": "Alumno creado", "id": nuevo.id}), 201
+    # Respuesta con ejemplo de contraseña generada (opcional, para debug)
+    return jsonify({
+        "mensaje": "Alumno creado",
+        "id": nuevo.id,
+        "ejemplo_password": password_claro  # Puedes eliminar esto en producción
+    }), 201
 
 @admin_bp.route("/api/admin/tabla/<int:id>", methods=["DELETE"])
 @token_required

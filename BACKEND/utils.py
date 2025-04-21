@@ -4,10 +4,18 @@ import hashlib
 
 
 def normalizar(texto):
-    texto = texto.lower().replace(" ", "")
+    # Paso 1: Minúsculas y normalización Unicode (sin eliminar espacios)
+    texto = texto.lower().strip()
     texto = unicodedata.normalize('NFD', texto)
-    return ''.join(c for c in texto if unicodedata.category(c) != 'Mn' or c == 'ñ')
-
+    
+    # Paso 2: Eliminar tildes pero conservar ñ y espacios
+    texto_normalizado = []
+    for c in texto:
+        if unicodedata.category(c) == 'Mn' and c != 'ñ':  # Elimina tildes pero no ñ
+            continue
+        texto_normalizado.append(c)
+    
+    return ''.join(texto_normalizado)
 def generar_hash_credencial(nombre: str, apellidos: str) -> str:
     completo = f"{nombre} {apellidos}".strip()
     completo_normalizado = normalizar(completo)
