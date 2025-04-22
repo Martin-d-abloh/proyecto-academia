@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 from database import init_db
 from models import db, Administrador, Alumno, Tabla, Documento
@@ -9,19 +10,21 @@ from routes.alumno_routes import alumno_bp
 
 
 def create_app():
-    load_dotenv()
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
+
+    uri = os.getenv("SQLALCHEMY_DATABASE_URI")
+    print("📦 URI desde .env:", uri)
 
     app = Flask(__name__)
     frontend_url = os.getenv("FRONTEND_URL", "https://proyecto-academia.vercel.app")
 
-    # ✅ CORS aplicado globalmente con orígenes permitidos
     CORS(app, origins=[
         "https://proyecto-academia.duckdns.org",
         "https://proyecto-academia.vercel.app"
     ], supports_credentials=True)
 
     basedir = os.path.abspath(os.path.dirname(__file__))
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'app.db')}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
     app.secret_key = "supersecreto"
     app.config.update(
