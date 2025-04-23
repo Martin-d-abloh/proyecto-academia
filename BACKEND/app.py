@@ -3,6 +3,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import logging
 from database import db
 from models import db, Administrador, Alumno, Tabla, Documento
 from routes.admin_routes import admin_bp
@@ -17,10 +18,8 @@ def create_app():
     app = Flask(__name__)
     frontend_url = os.getenv("FRONTEND_URL", "https://proyecto-academia.vercel.app")
 
-    #CORS(app, origins=[
-     #   "https://proyecto-academia.duckdns.org",
-      #  "https://proyecto-academia.vercel.app"
-    #], supports_credentials=True)
+    # Configurar CORS si es necesario más adelante
+    # CORS(app, origins=[frontend_url], supports_credentials=True)
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = uri
@@ -45,6 +44,8 @@ def create_app():
     return app
 
 if __name__ == "__main__":
+    # Configuración de logging a archivo
+    logging.basicConfig(filename='flask.log', level=logging.DEBUG)
+
     app = create_app()
     app.run(debug=True, host="0.0.0.0", port=5001)
-
