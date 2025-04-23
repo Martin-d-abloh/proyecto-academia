@@ -1,15 +1,12 @@
 from datetime import datetime
+import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import db
-from werkzeug.utils import secure_filename
-import uuid
-import hashlib
-import os
-from flask_sqlalchemy import SQLAlchemy
-from flask import Flask
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 
+# ENUM preexistente en PostgreSQL
 estado_enum = ENUM('pendiente', 'subido', name='estado_enum', create_type=False)
+
 
 class Administrador(db.Model):
     __tablename__ = 'administradores'
@@ -24,7 +21,7 @@ class Administrador(db.Model):
 
     @property
     def password(self):
-        raise AttributeError("La contraseña no se puede leer directamente")  
+        raise AttributeError("La contraseña no se puede leer directamente")
 
     @password.setter
     def password(self, password):
@@ -35,7 +32,6 @@ class Administrador(db.Model):
 
 
 class Tabla(db.Model):
-    """Hoja de cálculo con requisitos (columnas) y alumnos (filas)"""
     __tablename__ = 'tablas'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -49,16 +45,15 @@ class Tabla(db.Model):
 
 
 class Alumno(db.Model):
-    """Usuario que sube documentos para cumplir requisitos (fila en la tabla)"""
     __tablename__ = 'alumnos'
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre = db.Column(db.String(50), nullable=False)
-    email = db.Column(db.String(100), nullable=True) 
+    email = db.Column(db.String(100), nullable=True)
     apellidos = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
-    credencial = db.Column(db.String(64), unique=True)  
+    credencial = db.Column(db.String(64), unique=True)
 
     documentos = db.relationship('Documento', backref='alumno', cascade='all, delete-orphan')
 
@@ -70,14 +65,12 @@ class Alumno(db.Model):
 
 
 class Documento(db.Model):
-    """Modelo unificado para TODOS los documentos: requeridos y subidos por alumnos"""
     __tablename__ = 'documentos'
 
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(255), nullable=False)
     descripcion = db.Column(db.Text)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
-
     nombre_archivo = db.Column(db.String(255), unique=True)
     ruta = db.Column(db.String(512))
     estado = db.Column(estado_enum, default='pendiente')
