@@ -17,10 +17,10 @@ def create_app():
     app = Flask(__name__)
     frontend_url = os.getenv("FRONTEND_URL", "https://proyecto-academia.vercel.app")
 
-    CORS(app, origins=[
-        "https://proyecto-academia.duckdns.org",
-        "https://proyecto-academia.vercel.app"
-    ], supports_credentials=True)
+    #CORS(app, origins=[
+     #   "https://proyecto-academia.duckdns.org",
+      #  "https://proyecto-academia.vercel.app"
+    #], supports_credentials=True)
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     app.config['SQLALCHEMY_DATABASE_URI'] = uri
