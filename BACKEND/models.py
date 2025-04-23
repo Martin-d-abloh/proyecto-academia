@@ -14,7 +14,7 @@ class Administrador(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     usuario = db.Column(db.String(50), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(512))
     es_superadmin = db.Column(db.Boolean, default=False)
 
     tablas = db.relationship('Tabla', backref='administrador', cascade='all, delete-orphan')
@@ -51,7 +51,7 @@ class Alumno(db.Model):
     nombre = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), nullable=True)
     apellidos = db.Column(db.String(100), nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(512), nullable=False)
     tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
     credencial = db.Column(db.String(64), unique=True)
 
