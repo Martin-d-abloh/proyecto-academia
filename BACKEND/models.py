@@ -5,7 +5,7 @@ from database import db
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 
 # ENUM preexistente en PostgreSQL
-estado_enum = ENUM('pendiente', 'subido', name='estado_enum', create_type=False)
+estado_enum = ENUM('pendiente', 'subido', name='estado_enum', create_type=True)
 
 
 class Administrador(db.Model):
