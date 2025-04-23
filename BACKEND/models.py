@@ -7,6 +7,9 @@ import hashlib
 import os
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
+from sqlalchemy.dialects.postgresql import UUID, ENUM
+
+estado_enum = ENUM('pendiente', 'subido', name='estado_enum', create_type=False)
 
 class Administrador(db.Model):
     __tablename__ = 'administradores'
@@ -34,24 +37,22 @@ class Administrador(db.Model):
 class Tabla(db.Model):
     """Hoja de cálculo con requisitos (columnas) y alumnos (filas)"""
     __tablename__ = 'tablas'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.Text)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
     admin_id = db.Column(db.Integer, db.ForeignKey('administradores.id'), nullable=False)
-    
-    # Componentes de la tabla
+
     alumnos = db.relationship('Alumno', backref='tabla', cascade='all, delete-orphan')
     documentos = db.relationship("Documento", backref="tabla", cascade="all, delete-orphan")
-
 
 
 class Alumno(db.Model):
     """Usuario que sube documentos para cumplir requisitos (fila en la tabla)"""
     __tablename__ = 'alumnos'
-    
-    id = db.Column(db.String(32), primary_key=True, default=lambda: str(uuid.uuid4()))
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), nullable=True) 
     apellidos = db.Column(db.String(100), nullable=False)
@@ -59,7 +60,6 @@ class Alumno(db.Model):
     tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
     credencial = db.Column(db.String(64), unique=True)  
 
-    # Documentos subidos por este alumno
     documentos = db.relationship('Documento', backref='alumno', cascade='all, delete-orphan')
 
     def set_password(self, password):
@@ -69,27 +69,21 @@ class Alumno(db.Model):
         return check_password_hash(self.password_hash, password)
 
 
-
 class Documento(db.Model):
     """Modelo unificado para TODOS los documentos: requeridos y subidos por alumnos"""
     __tablename__ = 'documentos'
-    
+
     id = db.Column(db.Integer, primary_key=True)
-    
-    # Metadatos comunes
-    nombre = db.Column(db.String(255), nullable=False)  # Ej: "Certificado médico"
+    nombre = db.Column(db.String(255), nullable=False)
     descripcion = db.Column(db.Text)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Para documentos subidos por alumnos:
-    nombre_archivo = db.Column(db.String(255), unique=True)  # Ej: "alumno1_certificado.pdf"
-    ruta = db.Column(db.String(512))  # Ruta física en el servidor
-    estado = db.Column(db.String(20), default='pendiente')  # pendiente/aceptado/rechazado
-    
-    # Relaciones
-    tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)  # A qué tabla pertenece
-    alumno_id = db.Column(db.Integer, db.ForeignKey('alumnos.id'))  # NULL si es solo un requisito
-    
-    # Métodos
+
+    nombre_archivo = db.Column(db.String(255), unique=True)
+    ruta = db.Column(db.String(512))
+    estado = db.Column(estado_enum, default='pendiente')
+
+    tabla_id = db.Column(db.Integer, db.ForeignKey('tablas.id'), nullable=False)
+    alumno_id = db.Column(UUID(as_uuid=True), db.ForeignKey('alumnos.id'))
+
     def es_requerido(self):
         return self.alumno_id is None

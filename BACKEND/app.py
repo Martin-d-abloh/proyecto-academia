@@ -3,11 +3,10 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from pathlib import Path
 import os
-from database import init_db
+from database import db
 from models import db, Administrador, Alumno, Tabla, Documento
 from routes.admin_routes import admin_bp
 from routes.alumno_routes import alumno_bp
-
 
 def create_app():
     load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
@@ -33,38 +32,19 @@ def create_app():
         SESSION_COOKIE_HTTPONLY=False
     )
 
-    init_db(app)
-
+    db.init_app(app)
 
     # Registro de blueprints
     app.register_blueprint(admin_bp)
     app.register_blueprint(alumno_bp)
 
-    # Crear superadmin automáticamente si no existe
-    usuario = os.getenv("SUPERADMIN_USUARIO")
-    contrasena = os.getenv("SUPERADMIN_CONTRASENA")
-
-    if not usuario or not contrasena:
+    # Validación simple de entorno
+    if not os.getenv("SUPERADMIN_USUARIO") or not os.getenv("SUPERADMIN_CONTRASENA"):
         raise Exception("Debes definir SUPERADMIN_USUARIO y SUPERADMIN_CONTRASENA en tu archivo .env")
 
-    with app.app_context():
-        admin_existente = Administrador.query.filter_by(usuario=usuario).first()
-        if not admin_existente:
-            superadmin = Administrador(
-                nombre="Super Admin",
-                usuario=usuario,
-                es_superadmin=True
-            )
-            superadmin.password = contrasena
-            db.session.add(superadmin)
-            db.session.commit()
-            print("✅ Superadmin creado correctamente:", usuario)
-        else:
-            print("ℹ️ Superadmin ya existe:", usuario)
-
     return app
-
 
 if __name__ == "__main__":
     app = create_app()
     app.run(debug=True, port=5001)
+
