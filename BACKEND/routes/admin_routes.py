@@ -42,20 +42,23 @@ def api_login_admin():
 @token_required
 def api_crear_alumno(current_admin, id_tabla):
     data = request.get_json()
-    nombre = data.get("nombre", "").strip()  # Sanitización de espacios
-    apellidos = data.get("apellidos", "").strip()  # Sanitización de espacios
+
+    if not data or "nombre" not in data or "apellidos" not in data:
+        return jsonify({"error": "Faltan datos del alumno (nombre o apellidos)"}), 400
+
+    nombre = data.get("nombre", "").strip()
+    apellidos = data.get("apellidos", "").strip()
 
     if not nombre or not apellidos:
-        return jsonify({"error": "Faltan datos del alumno"}), 400
+        return jsonify({"error": "Nombre o apellidos vacíos"}), 400
 
     tabla = Tabla.query.get_or_404(id_tabla)
 
     if current_admin.id != tabla.admin_id and not current_admin.es_superadmin:
         return jsonify({"error": "Acceso denegado"}), 403
 
-    # Generación de credencial y contraseña (sin espacios)
     credencial = generar_hash_credencial(normalizar(nombre), normalizar(apellidos))
-    password_claro = f"{nombre}{apellidos}"  # <- Cambio clave: sin espacios
+    password_claro = f"{nombre}{apellidos}"
 
     nuevo = Alumno(
         nombre=nombre,
@@ -63,17 +66,17 @@ def api_crear_alumno(current_admin, id_tabla):
         tabla_id=id_tabla,
         credencial=credencial
     )
-    nuevo.set_password(password_claro)  # Almacena el hash, no el texto plano
+    nuevo.set_password(password_claro)
 
     db.session.add(nuevo)
     db.session.commit()
 
-    # Respuesta con ejemplo de contraseña generada (opcional, para debug)
     return jsonify({
         "mensaje": "Alumno creado",
         "id": nuevo.id,
-        "ejemplo_password": password_claro  # Puedes eliminar esto en producción
+        "ejemplo_password": password_claro
     }), 201
+
 
 @admin_bp.route("/api/admin/tabla/<int:id>", methods=["DELETE"])
 @token_required
@@ -175,10 +178,14 @@ def api_eliminar_documento_tabla(current_admin, tabla_id, doc_id):
 @token_required
 def api_añadir_documento(current_admin, id):
     data = request.get_json()
-    nombre_doc = data.get("nombre")
+
+    if not data or "nombre" not in data:
+        return jsonify({"error": "Nombre del documento requerido"}), 400
+
+    nombre_doc = data.get("nombre", "").strip()
 
     if not nombre_doc:
-        return jsonify({"error": "Nombre del documento requerido"}), 400
+        return jsonify({"error": "El nombre del documento está vacío"}), 400
 
     tabla = Tabla.query.get_or_404(id)
 
@@ -196,6 +203,7 @@ def api_añadir_documento(current_admin, id):
     db.session.commit()
 
     return jsonify({"mensaje": "Documento creado"}), 201
+
 
 @admin_bp.route("/api/admin/tabla/<int:id>", methods=["GET"])
 @token_required
