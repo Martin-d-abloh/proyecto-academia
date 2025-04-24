@@ -169,7 +169,8 @@ def api_login_alumno():
     print(f"Hash generado: {credencial_hash}")
 
     alumno = Alumno.query.filter_by(credencial=credencial_hash).first()
-    if alumno and alumno.check_password(credencial_raw):
+    if alumno:
+
         token = jwt.encode({
             "alumno_id": alumno.id,
             "exp": datetime.utcnow() + timedelta(hours=12)
