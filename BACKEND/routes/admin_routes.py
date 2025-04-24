@@ -212,6 +212,7 @@ def api_añadir_documento(current_admin, id):
         nombre_archivo=f"placeholder_{nombre_doc}_{datetime.utcnow().timestamp()}".replace(" ", "_"),
         ruta=None
     )
+    print("🧪 DEBUG DOC →", nuevo.nombre, nuevo.estado)
 
     try:
         db.session.add(nuevo)
