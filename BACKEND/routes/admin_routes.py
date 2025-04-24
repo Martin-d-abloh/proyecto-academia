@@ -38,6 +38,7 @@ def api_login_admin():
     return jsonify({"error": "Credenciales incorrectas"}), 401
 
 
+
 @admin_bp.route("/api/admin/tabla/<int:id_tabla>/alumnos", methods=["POST"])
 @token_required
 def api_crear_alumno(current_admin, id_tabla):
@@ -68,14 +69,23 @@ def api_crear_alumno(current_admin, id_tabla):
     )
     nuevo.set_password(password_claro)
 
-    db.session.add(nuevo)
-    db.session.commit()
+    try:
+        db.session.add(nuevo)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Error de integridad: la credencial ya existe"}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
 
     return jsonify({
         "mensaje": "Alumno creado",
         "id": nuevo.id,
         "ejemplo_password": password_claro
     }), 201
+
+
 
 
 @admin_bp.route("/api/admin/tabla/<int:id>", methods=["DELETE"])
@@ -174,6 +184,8 @@ def api_eliminar_documento_tabla(current_admin, tabla_id, doc_id):
         app.logger.error(f"Error al eliminar documento: {str(e)}")
         return jsonify({"error": "Error al eliminar documento"}), 500
 
+
+
 @admin_bp.route("/api/admin/tabla/<int:id>/documento", methods=["POST"])
 @token_required
 def api_añadir_documento(current_admin, id):
@@ -199,8 +211,15 @@ def api_añadir_documento(current_admin, id):
         estado="requerido"
     )
 
-    db.session.add(nuevo)
-    db.session.commit()
+    try:
+        db.session.add(nuevo)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Error de integridad: documento duplicado o datos inválidos"}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
 
     return jsonify({"mensaje": "Documento creado"}), 201
 
