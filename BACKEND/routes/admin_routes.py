@@ -221,8 +221,11 @@ def api_añadir_documento(current_admin, id):
         db.session.rollback()
         return jsonify({"error": "Error de integridad: documento duplicado o datos inválidos"}), 400
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
+
 
     return jsonify({"mensaje": "Documento creado"}), 201
 
