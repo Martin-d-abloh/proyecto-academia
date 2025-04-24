@@ -208,7 +208,9 @@ def api_añadir_documento(current_admin, id):
         nombre=nombre_doc,
         tabla_id=tabla.id,
         alumno_id=None,
-        estado="pendiente"
+        estado="pendiente",
+        nombre_archivo=f"placeholder_{nombre_doc}_{datetime.utcnow().timestamp()}".replace(" ", "_"),
+        ruta=None
     )
 
     try:
