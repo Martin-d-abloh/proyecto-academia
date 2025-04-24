@@ -172,11 +172,12 @@ def api_login_alumno():
     if alumno:
 
         token = jwt.encode({
-            "alumno_id": alumno.id,
+            "alumno_id": str(alumno.id),
             "exp": datetime.utcnow() + timedelta(hours=12)
         }, os.getenv("JWT_SECRET_KEY"), algorithm="HS256")
 
-        return jsonify({"token": token, "alumno_id": alumno.id})
+        return jsonify({"token": token, "alumno_id": str(alumno.id)})
+
 
     return jsonify({"error": "Credenciales incorrectas"}), 401
 
