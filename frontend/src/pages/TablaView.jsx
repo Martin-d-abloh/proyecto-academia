@@ -68,7 +68,13 @@ function TablaView() {
         },
         body: JSON.stringify({ nombre: nuevoDoc }),
       })
-      const data = await res.json()
+  
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        data = { error: "Respuesta no válida del servidor" }
+      }
   
       if (res.ok) {
         setMensaje("✅ Documento añadido")
@@ -79,8 +85,10 @@ function TablaView() {
       }
     } catch (err) {
       console.error("Error añadiendo documento:", err)
+      setMensaje("❌ Error de red")
     }
   }
+  
   
   const eliminarDocumento = async (docId) => {
     if (!confirm("¿Eliminar este documento?")) return
@@ -141,7 +149,13 @@ function TablaView() {
         },
         body: JSON.stringify(nuevoAlumno)
       })
-      const data = await res.json()
+  
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        data = { error: "Respuesta no válida del servidor" }
+      }
   
       if (res.ok) {
         setMensaje("✅ Alumno añadido")
@@ -152,8 +166,10 @@ function TablaView() {
       }
     } catch (err) {
       console.error("Error añadiendo alumno:", err)
+      setMensaje("❌ Error de red")
     }
   }
+  
   
   const descargarDocumento = async (id, nombreAlumno, nombreDoc) => {
     try {
