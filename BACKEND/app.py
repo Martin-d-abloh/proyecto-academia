@@ -45,7 +45,14 @@ def create_app():
 
 if __name__ == "__main__":
     # Configuración de logging a archivo
-    logging.basicConfig(filename='flask.log', level=logging.DEBUG)
+    logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("flask.log"),
+        logging.StreamHandler()  # imprime en consola del sistema (visible en journalctl)
+    ]
+)
 
     app = create_app()
     app.run(debug=True, host="0.0.0.0", port=5001)

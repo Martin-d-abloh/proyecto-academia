@@ -208,7 +208,7 @@ def api_añadir_documento(current_admin, id):
         nombre=nombre_doc,
         tabla_id=tabla.id,
         alumno_id=None,
-        estado="requerido"
+        estado="pendiente"
     )
 
     try:
