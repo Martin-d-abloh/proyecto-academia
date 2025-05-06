@@ -68,6 +68,9 @@ function AdminHome() {
   }
   
   const eliminarTabla = async (tablaId) => {
+    const confirmar = window.confirm("¿Estás seguro de que quieres eliminar esta tabla? Esta acción no se puede deshacer.");
+    if (!confirmar) return;
+  
     const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${tablaId}`, {
       method: "DELETE",
       headers: {
@@ -93,6 +96,7 @@ function AdminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
+  
   
 
   return (
