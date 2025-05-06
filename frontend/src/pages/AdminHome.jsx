@@ -36,7 +36,14 @@ function AdminHome() {
   }, [token, id])
   
   const crearTabla = async () => {
-    if (!nuevaTabla) return
+    if (!nuevaTabla.trim()) return
+  
+    // Verificar si ya existe una tabla con ese nombre
+    const nombreExiste = tablas.some(t => t.nombre.toLowerCase() === nuevaTabla.trim().toLowerCase())
+    if (nombreExiste) {
+      setMensaje("⚠️ Ya existe una tabla con ese nombre")
+      return
+    }
   
     const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tablas`, {
       method: "POST",
@@ -44,7 +51,7 @@ function AdminHome() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ nombre: nuevaTabla })
+      body: JSON.stringify({ nombre: nuevaTabla.trim() })
     })
   
     const data = await res.json()
@@ -66,6 +73,7 @@ function AdminHome() {
       setMensaje(`❌ Error: ${data.error}`)
     }
   }
+  
   
   const eliminarTabla = async (tablaId) => {
     const confirmar = window.confirm("¿Estás seguro de que quieres eliminar esta tabla? Esta acción no se puede deshacer.");
