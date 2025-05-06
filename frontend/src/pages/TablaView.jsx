@@ -58,7 +58,15 @@ function TablaView() {
   }, {})
   
   const añadirDocumento = async () => {
-    if (!nuevoDoc) return
+    if (!nuevoDoc.trim()) return
+  
+    // Verificar si ya existe un documento con ese nombre en la tabla
+    const nombreExiste = tabla.documentos.some(doc => doc.nombre.toLowerCase() === nuevoDoc.trim().toLowerCase())
+    if (nombreExiste) {
+      setMensaje("⚠️ Ya existe un documento con ese nombre en esta tabla")
+      return
+    }
+  
     try {
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/tabla/${id}/documento`, {
         method: "POST",
@@ -66,7 +74,7 @@ function TablaView() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nombre: nuevoDoc }),
+        body: JSON.stringify({ nombre: nuevoDoc.trim() }),
       })
   
       let data
@@ -88,6 +96,7 @@ function TablaView() {
       setMensaje("❌ Error de red")
     }
   }
+  
   
   
   const eliminarDocumento = async (docId) => {
