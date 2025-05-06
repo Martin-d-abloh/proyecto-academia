@@ -213,10 +213,10 @@ function TablaView() {
       <h1 className="text-3xl font-bold text-blue-800 mb-6 drop-shadow">📄 {tabla.nombre}</h1>
       {mensaje && <div className="mb-4 text-green-700 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">{mensaje}</div>}
 
-      <div className="overflow-x-auto w-full max-w-full border rounded-xl shadow">
-        <table className="w-full table-auto border-collapse bg-white">
-          <thead className="bg-blue-100 text-blue-800 uppercase">
-            <tr>
+      <div className="w-full overflow-x-auto max-w-6xl mx-auto bg-white rounded-xl p-4 shadow">
+          <table className="w-full table-auto border-collapse">
+            <thead className="bg-blue-100 text-blue-800 uppercase">
+              <tr>
               <th className="border px-4 py-2 text-left">Nombre</th>
               {tabla.documentos.map((doc) => (
                 <th key={doc.id} className="border px-4 py-2 text-left">
