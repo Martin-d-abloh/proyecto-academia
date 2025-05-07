@@ -45,7 +45,7 @@ function Layout() {
         </header>
       )}
 
-      <main className="max-w-5xl mx-auto p-6">
+      <main className="w-full mx-auto p-6">
         <Outlet />
       </main>
     </div>
