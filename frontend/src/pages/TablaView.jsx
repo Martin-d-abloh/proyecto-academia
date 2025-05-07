@@ -213,8 +213,8 @@ function TablaView() {
       <h1 className="text-3xl font-bold text-blue-800 mb-6 drop-shadow">📄 {tabla.nombre}</h1>
       {mensaje && <div className="mb-4 text-green-700 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">{mensaje}</div>}
 
-      <div className="w-full overflow-x-auto max-w-6xl mx-auto bg-white rounded-xl p-4 shadow">
-          <table className="w-full table-auto border-collapse">
+      <div className="w-full overflow-x-auto mx-auto bg-white rounded-xl p-4 shadow flex justify-center">
+          <table className="w-full max-w-screen-2xl table-auto border-collapse">
             <thead className="bg-blue-100 text-blue-800 uppercase">
               <tr>
               <th className="border px-4 py-2 text-left">Nombre</th>
