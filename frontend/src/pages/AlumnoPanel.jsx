@@ -150,13 +150,7 @@ function AlumnoPanel() {
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
-        {alumnoCargando ? (
-          <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno <span className="italic text-gray-500">Cargando...</span></h1>
-        ) : alumnoError ? (
-          <h1 className="text-3xl font-black text-red-700 mb-6">❌ {alumnoError}</h1>
-        ) : (
-          <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno {alumno.nombre} {alumno.apellidos}</h1>
-        )}
+        <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno</h1>
     
         {mensaje && (
           <p className="mb-4 text-center text-green-800 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">
