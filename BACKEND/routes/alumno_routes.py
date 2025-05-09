@@ -206,9 +206,9 @@ def ver_documento_alumno(doc_id):
     mimetype, _ = mimetypes.guess_type(doc.ruta)
     return send_file(doc.ruta, mimetype=mimetype or "application/octet-stream")
 
-@alumno_bp.route("/api/public/alumno/<int:id>", methods=["GET"])
+@alumno_bp.route("/api/public/alumno/<uuid:id>", methods=["GET"])
 def api_public_ver_alumno(id):
-    alumno = Alumno.query.get_or_404(id)
+    alumno = Alumno.query.get_or_404(str(id))
     return jsonify({
         "id": alumno.id,
         "nombre": alumno.nombre,
