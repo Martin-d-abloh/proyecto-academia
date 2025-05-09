@@ -8,6 +8,8 @@ function AlumnoPanel() {
   const [archivos, setArchivos] = useState({})
   const [mensaje, setMensaje] = useState("")
   const [alumno, setAlumno] = useState({ nombre: "", apellidos: "" })
+  const [alumnoCargando, setAlumnoCargando] = useState(true)
+  const [alumnoError, setAlumnoError] = useState("")
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -19,17 +21,24 @@ function AlumnoPanel() {
 
     // Obtener datos del alumno
     const cargarAlumno = async () => {
+      setAlumnoCargando(true)
+      setAlumnoError("")
       try {
         const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
-        if (res.ok) {
-          const data = await res.json()
+        const data = await res.json()
+        console.log("Respuesta API alumno:", data)
+        if (res.ok && data.nombre) {
           setAlumno({ nombre: data.nombre, apellidos: data.apellidos })
+        } else {
+          setAlumnoError(data.error || "No se pudo obtener el nombre del alumno")
         }
       } catch (err) {
-        // No es crítico, solo loguear
+        setAlumnoError("Error de red o backend al obtener el alumno")
         console.error("No se pudo cargar el nombre del alumno", err)
+      } finally {
+        setAlumnoCargando(false)
       }
     }
     cargarAlumno()
@@ -141,7 +150,13 @@ function AlumnoPanel() {
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
-        <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno {alumno.nombre || ""} {alumno.apellidos || ""}</h1>
+        {alumnoCargando ? (
+          <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno <span className="italic text-gray-500">Cargando...</span></h1>
+        ) : alumnoError ? (
+          <h1 className="text-3xl font-black text-red-700 mb-6">❌ {alumnoError}</h1>
+        ) : (
+          <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno {alumno.nombre} {alumno.apellidos}</h1>
+        )}
     
         {mensaje && (
           <p className="mb-4 text-center text-green-800 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">
