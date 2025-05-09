@@ -150,7 +150,10 @@ function AlumnoPanel() {
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
-        <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno</h1>
+        <h1 className="text-3xl font-black text-green-700 mb-2">🎓 Panel del Alumno</h1>
+        {alumno.nombre && (
+          <h2 className="text-xl font-semibold text-green-800 mb-6">Alumno: {alumno.nombre} {alumno.apellidos}</h2>
+        )}
     
         {mensaje && (
           <p className="mb-4 text-center text-green-800 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">
