@@ -19,26 +19,22 @@ function AlumnoPanel() {
       return
     }
 
-    // Obtener datos del alumno
+    // Obtener datos públicos del alumno
     const cargarAlumno = async () => {
-      setAlumnoCargando(true)
-      setAlumnoError("")
       try {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        const data = await res.json()
-        console.log("Respuesta API alumno:", data)
-        if (res.ok && data.nombre) {
+        console.log('Intentando obtener datos públicos del alumno con id:', id)
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/public/alumno/${id}`)
+        console.log('Status respuesta:', res.status)
+        if (res.ok) {
+          const data = await res.json()
+          console.log('Datos recibidos del backend:', data)
           setAlumno({ nombre: data.nombre, apellidos: data.apellidos })
         } else {
-          setAlumnoError(data.error || "No se pudo obtener el nombre del alumno")
+          const errorData = await res.json().catch(() => ({}))
+          console.error('Error al obtener alumno:', errorData)
         }
       } catch (err) {
-        setAlumnoError("Error de red o backend al obtener el alumno")
-        console.error("No se pudo cargar el nombre del alumno", err)
-      } finally {
-        setAlumnoCargando(false)
+        console.error('Error de red al obtener alumno:', err)
       }
     }
     cargarAlumno()
@@ -147,6 +143,7 @@ function AlumnoPanel() {
       }
     }
     
+
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
