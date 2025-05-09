@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
 
@@ -8,6 +7,7 @@ function AlumnoPanel() {
   const [documentos, setDocumentos] = useState([])
   const [archivos, setArchivos] = useState({})
   const [mensaje, setMensaje] = useState("")
+  const [alumno, setAlumno] = useState({ nombre: "", apellidos: "" })
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -16,6 +16,23 @@ function AlumnoPanel() {
       navigate("/login_alumno")
       return
     }
+
+    // Obtener datos del alumno
+    const cargarAlumno = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/alumno/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setAlumno({ nombre: data.nombre, apellidos: data.apellidos })
+        }
+      } catch (err) {
+        // No es crítico, solo loguear
+        console.error("No se pudo cargar el nombre del alumno", err)
+      }
+    }
+    cargarAlumno()
 
     const cargarDocumentos = async () => {
       try {
@@ -124,7 +141,7 @@ function AlumnoPanel() {
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
-        <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno #{id}</h1>
+        <h1 className="text-3xl font-black text-green-700 mb-6">🎓 Panel del Alumno {alumno.nombre || ""} {alumno.apellidos || ""}</h1>
     
         {mensaje && (
           <p className="mb-4 text-center text-green-800 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">
