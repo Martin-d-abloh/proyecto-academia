@@ -1,6 +1,7 @@
 // TablaView.jsx
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
+import JSZip from 'jszip'
 
 function TablaView() {
   const { id } = useParams()
@@ -207,10 +208,61 @@ function TablaView() {
     window.open(url, "_blank")
   }
   
+  const descargarTabla = async () => {
+    try {
+      const zip = new JSZip()
+      
+      // Create a folder for each student
+      for (const alumno of tabla.alumnos) {
+        const alumnoFolder = zip.folder(`${alumno.nombre} ${alumno.apellidos}`)
+        
+        // Get all documents for this student
+        const documentosAlumno = tabla.subidos.filter(d => d.alumno_id === alumno.id)
+        
+        // Download and add each document to the zip
+        for (const doc of documentosAlumno) {
+          try {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/documento/${doc.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            
+            if (!res.ok) throw new Error(`Error al descargar ${doc.nombre}`)
+            
+            const blob = await res.blob()
+            alumnoFolder.file(`${doc.nombre}.pdf`, blob)
+          } catch (err) {
+            console.error(`Error descargando ${doc.nombre}:`, err)
+          }
+        }
+      }
+      
+      // Generate and download the zip file
+      const content = await zip.generateAsync({ type: "blob" })
+      const url = window.URL.createObjectURL(content)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${tabla.nombre}.zip`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      
+      setMensaje("✅ Tabla descargada exitosamente")
+    } catch (err) {
+      console.error("Error al descargar la tabla:", err)
+      setMensaje("❌ Error al descargar la tabla")
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 p-6">
-      <h1 className="text-3xl font-bold text-blue-800 mb-6 drop-shadow">📄 {tabla.nombre}</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-blue-800 drop-shadow">📄 {tabla.nombre}</h1>
+        <button
+          onClick={descargarTabla}
+          className="bg-green-600 text-white px-5 py-2 rounded hover:bg-green-700 shadow flex items-center gap-2"
+        >
+          📥 Descargar Tabla
+        </button>
+      </div>
       {mensaje && <div className="mb-4 text-green-700 font-medium bg-white border-l-4 border-green-500 p-3 rounded shadow-sm">{mensaje}</div>}
 
       <div className="w-full overflow-x-auto mx-auto bg-white rounded-xl p-4 shadow flex justify-center">
